@@ -42,19 +42,19 @@ const testimonials = [
     id: 1,
     name: "Priya Sharma",
     role: "Parent",
-    content: "SchoolSeeker made finding the perfect school for my daughter incredibly easy. The detailed information and booking process saved us so much time!",
+    content: "Guardiann made finding the perfect school for my daughter incredibly easy. The detailed information and booking process saved us so much time!",
   },
   {
     id: 2,
     name: "Rahul Gupta",
     role: "Student",
-    content: "I was confused about which college to choose for my engineering degree. Thanks to SchoolSeeker, I found the perfect fit for my career goals.",
+    content: "I was confused about which college to choose for my engineering degree. Thanks to Guardiann, I found the perfect fit for my career goals.",
   },
   {
     id: 3,
     name: "Aarav Patel",
     role: "Teacher",
-    content: "As an educator, I appreciate how SchoolSeeker connects students with quality institutions. The platform is intuitive and comprehensive.",
+    content: "As an educator, I appreciate how Guardiann connects students with quality institutions. The platform is intuitive and comprehensive.",
   },
 ];
 
@@ -255,7 +255,7 @@ const HomePage = () => {
           >
             <h2 className="text-3xl font-bold mb-4">What Our Users Say</h2>
             <p className="text-gray-600 max-w-2xl mx-auto">
-              Hear from students, parents and educators who have found their perfect match through SchoolSeeker
+              Hear from students, parents and educators who have found their perfect match through Guardiann
             </p>
           </motion.div>
 
@@ -297,7 +297,7 @@ const HomePage = () => {
           <div className="max-w-3xl mx-auto text-center">
             <h2 className="text-3xl font-bold mb-6">Ready to Find Your Perfect Educational Institution?</h2>
             <p className="text-lg mb-8">
-              Join thousands of students who have found their ideal learning environment through SchoolSeeker Connect
+              Join thousands of students who have found their ideal learning environment through Guardiann Connect
             </p>
             <Button size="lg" className="bg-white text-education-700 hover:bg-gray-100">
               Get Started Today

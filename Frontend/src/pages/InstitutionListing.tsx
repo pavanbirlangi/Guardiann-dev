@@ -1,121 +1,9 @@
-
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Search, Filter, Check } from "lucide-react";
-
-// Mock data for institutions
-const mockInstitutions = {
-  schools: [
-    {
-      id: 1,
-      name: "Greenfield International School",
-      address: "123 Education Lane, Delhi",
-      thumbnail: "https://images.unsplash.com/photo-1613896640137-bb5b31496315?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80",
-      fees: "₹80,000",
-      rating: 4.7,
-      city: "Delhi",
-      type: "International"
-    },
-    {
-      id: 2,
-      name: "Summit Public School",
-      address: "456 Learning Road, Mumbai",
-      thumbnail: "https://images.unsplash.com/photo-1580582932707-520aed937b7b?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80",
-      fees: "₹65,000",
-      rating: 4.5,
-      city: "Mumbai",
-      type: "CBSE"
-    },
-    {
-      id: 3,
-      name: "Cambridge Academy",
-      address: "789 Knowledge Avenue, Bangalore",
-      thumbnail: "https://images.unsplash.com/photo-1523050854058-8df90110c9f1?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80",
-      fees: "₹95,000",
-      rating: 4.8,
-      city: "Bangalore",
-      type: "International"
-    },
-    {
-      id: 4,
-      name: "Excel Public School",
-      address: "234 Education Street, Chennai",
-      thumbnail: "https://images.unsplash.com/photo-1598812231682-36a66a049384?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80",
-      fees: "₹70,000",
-      rating: 4.3,
-      city: "Chennai",
-      type: "State Board"
-    }
-  ],
-  colleges: [
-    {
-      id: 1,
-      name: "National Institute of Technology",
-      address: "101 College Road, Delhi",
-      thumbnail: "https://images.unsplash.com/photo-1607237138185-eedd9c632b0b?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80",
-      fees: "₹1,25,000",
-      rating: 4.9,
-      city: "Delhi",
-      type: "Engineering"
-    },
-    {
-      id: 2,
-      name: "St. Xavier's College",
-      address: "202 University Lane, Mumbai",
-      thumbnail: "https://images.unsplash.com/photo-1598812231682-36a66a049384?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80",
-      fees: "₹85,000",
-      rating: 4.6,
-      city: "Mumbai",
-      type: "Arts & Science"
-    },
-  ],
-  coaching: [
-    {
-      id: 1,
-      name: "Brilliant Tutorials",
-      address: "303 Coaching Street, Delhi",
-      thumbnail: "https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80",
-      fees: "₹45,000",
-      rating: 4.5,
-      city: "Delhi",
-      type: "JEE/NEET"
-    },
-    {
-      id: 2,
-      name: "Excel Academy",
-      address: "404 Training Road, Mumbai",
-      thumbnail: "https://images.unsplash.com/photo-1522881193457-37ae97c905bf?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80",
-      fees: "₹35,000",
-      rating: 4.4,
-      city: "Mumbai",
-      type: "UPSC"
-    },
-  ],
-  "pg-colleges": [
-    {
-      id: 1,
-      name: "Indian Institute of Management",
-      address: "505 MBA Road, Bangalore",
-      thumbnail: "https://images.unsplash.com/photo-1541339907198-e08756dedf3f?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80",
-      fees: "₹2,50,000",
-      rating: 4.9,
-      city: "Bangalore",
-      type: "MBA"
-    },
-    {
-      id: 2,
-      name: "National Law School",
-      address: "606 Masters Avenue, Delhi",
-      thumbnail: "https://images.unsplash.com/photo-1523050854058-8df90110c9f1?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80",
-      fees: "₹1,80,000",
-      rating: 4.8,
-      city: "Delhi",
-      type: "Law"
-    },
-  ]
-};
+import { toast } from "sonner";
 
 const categoryTitles = {
   schools: "Schools",
@@ -129,8 +17,37 @@ const InstitutionListing = () => {
   const [filterOpen, setFilterOpen] = useState(false);
   const [cityFilter, setCityFilter] = useState<string | null>(null);
   const [typeFilter, setTypeFilter] = useState<string | null>(null);
+  const [institutions, setInstitutions] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  if (!category || !mockInstitutions[category as keyof typeof mockInstitutions]) {
+  useEffect(() => {
+    const fetchInstitutions = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const response = await fetch(`${import.meta.env.VITE_API_URL}/institutions/list/${category}`);
+        const data = await response.json();
+        
+        if (!response.ok) {
+          throw new Error(data.message || 'Failed to fetch institutions');
+        }
+
+        setInstitutions(data.data || []);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to fetch institutions');
+        toast.error('Failed to fetch institutions');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (category) {
+      fetchInstitutions();
+    }
+  }, [category]);
+
+  if (!category || !categoryTitles[category as keyof typeof categoryTitles]) {
     return (
       <Layout>
         <div className="container py-12 text-center">
@@ -144,7 +61,6 @@ const InstitutionListing = () => {
     );
   }
 
-  const institutions = mockInstitutions[category as keyof typeof mockInstitutions];
   const categoryTitle = categoryTitles[category as keyof typeof categoryTitles] || "Institutions";
 
   // Extract unique cities and types for filters
@@ -163,6 +79,31 @@ const InstitutionListing = () => {
     setCityFilter(null);
     setTypeFilter(null);
   };
+
+  if (loading) {
+    return (
+      <Layout>
+        <div className="container py-12 text-center">
+          <h1 className="text-2xl font-bold mb-4">Loading...</h1>
+          <p>Please wait while we fetch the institutions.</p>
+        </div>
+      </Layout>
+    );
+  }
+
+  if (error) {
+    return (
+      <Layout>
+        <div className="container py-12 text-center">
+          <h1 className="text-2xl font-bold mb-4">Error</h1>
+          <p>{error}</p>
+          <Button className="mt-4" onClick={() => window.location.reload()}>
+            Try Again
+          </Button>
+        </div>
+      </Layout>
+    );
+  }
 
   return (
     <Layout>
@@ -289,7 +230,7 @@ const InstitutionListing = () => {
               <div key={institution.id} className="bg-white rounded-lg overflow-hidden shadow-md hover:shadow-lg transition-shadow duration-300">
                 <div className="aspect-w-16 aspect-h-9 relative h-48">
                   <img
-                    src={institution.thumbnail}
+                    src={institution.thumbnail_url}
                     alt={institution.name}
                     className="w-full h-full object-cover"
                   />
@@ -310,7 +251,7 @@ const InstitutionListing = () => {
                   <div className="flex justify-between items-center">
                     <div>
                       <p className="text-xs text-gray-500">Starting from</p>
-                      <p className="font-bold text-education-600">{institution.fees}</p>
+                      <p className="font-bold text-education-600">₹{institution.starting_from.toLocaleString()}</p>
                     </div>
                     <Link to={`/institution/${category}/${institution.id}`}>
                       <Button size="sm">View Details</Button>

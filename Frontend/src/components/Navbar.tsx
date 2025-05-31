@@ -36,7 +36,7 @@ const Navbar = () => {
             whileHover={{ scale: 1.05 }}
             transition={{ duration: 0.2 }}
           >
-            SchoolSeeker
+            Guardiann
           </motion.span>
         </Link>
 
@@ -110,7 +110,7 @@ const Navbar = () => {
             <div className="flex items-center justify-between mb-8">
               <Link to="/" className="flex items-center space-x-2">
                 <span className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-education-600 to-education-400">
-                  SchoolSeeker
+                    Guardiann
                 </span>
               </Link>
               <Button variant="ghost" size="icon" onClick={toggleMenu}>

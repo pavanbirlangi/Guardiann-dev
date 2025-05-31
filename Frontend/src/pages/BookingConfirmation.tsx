@@ -176,7 +176,7 @@ const BookingConfirmation = () => {
               {/* Footer */}
               <div className="border-t p-6">
                 <p className="text-center text-gray-600 text-sm mb-4">
-                  Thank you for choosing SchoolSeeker Connect.
+                  Thank you for choosing Guardiann Connect.
                 </p>
                 <div className="text-center">
                   <Link to="/">

@@ -1,54 +1,75 @@
-
-import React from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { School, Book, Users, Calendar } from "lucide-react";
+import axios from "axios";
 
-const categories = [
-  {
-    id: "schools",
-    title: "Schools",
-    description:
-      "Find the best K-12 schools in your area, from primary to senior secondary education. Compare facilities, curriculum, and more to make the best choice for your child.",
-    icon: <School className="h-10 w-10" />,
-    color: "bg-blue-100 text-blue-600",
-    subcategories: ["Primary Schools", "Secondary Schools", "International Schools", "Boarding Schools"],
-    path: "/categories/schools",
-  },
-  {
-    id: "colleges",
-    title: "Colleges",
-    description:
-      "Explore undergraduate colleges offering diverse courses and specializations. Find the perfect institution to kick-start your career with the right education.",
-    icon: <Book className="h-10 w-10" />,
-    color: "bg-green-100 text-green-600",
-    subcategories: ["Engineering", "Medical", "Arts & Humanities", "Commerce & Business"],
-    path: "/categories/colleges",
-  },
-  {
-    id: "coaching",
-    title: "Coaching Centers",
-    description:
-      "Discover coaching centers for competitive exams, skills development, and academic support. Get expert guidance to achieve your learning goals.",
-    icon: <Users className="h-10 w-10" />,
-    color: "bg-purple-100 text-purple-600",
-    subcategories: ["Competitive Exams", "Language Learning", "Arts & Music", "Sports & Fitness"],
-    path: "/categories/coaching",
-  },
-  {
-    id: "pg-colleges",
-    title: "PG Colleges",
-    description:
-      "Find the best postgraduate programs to advance your education and career. Compare specializations, research opportunities, and placement records.",
-    icon: <Calendar className="h-10 w-10" />,
-    color: "bg-amber-100 text-amber-600",
-    subcategories: ["Masters Programs", "MBA", "PhD", "Specialized PG Diplomas"],
-    path: "/categories/pg-colleges",
-  },
-];
+interface Category {
+  id: string;
+  name: string;
+  slug: string;
+  description: string;
+  subcategories: string[];
+  display_order: number;
+}
 
-const CategoriesPage = () => {
+interface ApiResponse {
+  success: boolean;
+  data: Category[];
+  message?: string;
+  error?: string;
+}
+
+const Categories = () => {
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const response = await axios.get<ApiResponse>('http://localhost:3000/api/categories');
+        if (response.data.success) {
+          setCategories(response.data.data);
+        } else {
+          setError('Failed to fetch categories');
+        }
+      } catch (err) {
+        setError('Error fetching categories');
+        console.error('Error fetching categories:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchCategories();
+  }, []);
+
+  // Map of category names to their respective icons
+  const categoryIcons: { [key: string]: JSX.Element } = {
+    'Schools': <School className="h-10 w-10" />,
+    'Colleges': <Book className="h-10 w-10" />,
+    'Coaching Centers': <Users className="h-10 w-10" />,
+    'PG Colleges': <Calendar className="h-10 w-10" />,
+  };
+
+  // Map of category names to their respective colors
+  const categoryColors: { [key: string]: string } = {
+    'Schools': 'bg-blue-100 text-blue-600',
+    'Colleges': 'bg-green-100 text-green-600',
+    'Coaching Centers': 'bg-purple-100 text-purple-600',
+    'PG Colleges': 'bg-amber-100 text-amber-600',
+  };
+
+  if (loading) {
+    return <div className="flex justify-center items-center min-h-screen">Loading...</div>;
+  }
+
+  if (error) {
+    return <div className="flex justify-center items-center min-h-screen text-red-500">{error}</div>;
+  }
+
   return (
     <Layout>
       <section className="py-12 bg-gray-50">
@@ -67,10 +88,10 @@ const CategoriesPage = () => {
               <div key={category.id} className="bg-white rounded-xl shadow-md overflow-hidden">
                 <div className="md:flex">
                   <div className="md:flex-shrink-0 flex items-center justify-center p-8 md:w-64">
-                    <div className={`p-6 rounded-full ${category.color}`}>{category.icon}</div>
+                    <div className={`p-6 rounded-full ${categoryColors[category.name] || 'bg-gray-100'}`}>{categoryIcons[category.name] || <div className="h-10 w-10" />}</div>
                   </div>
                   <div className="p-8 md:flex-1">
-                    <h2 className="text-2xl font-bold mb-3">{category.title}</h2>
+                    <h2 className="text-2xl font-bold mb-3">{category.name}</h2>
                     <p className="text-gray-600 mb-4">{category.description}</p>
                     
                     <div className="mb-6">
@@ -88,9 +109,9 @@ const CategoriesPage = () => {
                     </div>
                     
                     <div className="flex justify-start">
-                      <Link to={category.path}>
+                      <Link to={`/categories/${category.slug}`}>
                         <Button className="bg-education-600 hover:bg-education-700">
-                          Browse {category.title}
+                          Browse {category.name}
                         </Button>
                       </Link>
                     </div>
@@ -105,4 +126,4 @@ const CategoriesPage = () => {
   );
 };
 
-export default CategoriesPage;
+export default Categories;

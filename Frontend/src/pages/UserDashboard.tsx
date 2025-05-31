@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/components/ui/use-toast";
 import { Calendar, Check, Download, User } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import axios from "axios";
 
 // Mock booking data
 const mockBookings = [
@@ -52,17 +53,56 @@ const mockBookings = [
   },
 ];
 
+interface UserProfile {
+  id: string;
+  email: string;
+  full_name: string;
+  phone: string;
+  profile_picture_url: string;
+  address: string;
+  city: string;
+  state: string;
+  country: string;
+  created_at: string;
+  last_login: string;
+}
+
+interface ApiResponse<T> {
+  success: boolean;
+  message: string;
+  data: T;
+}
+
 const UserDashboard = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user, logout } = useAuth();
   const [activeTab, setActiveTab] = useState<string>("bookings");
-  const [userProfile, setUserProfile] = useState({
-    name: user?.name || "",
-    email: user?.email || "",
-    phone: "",
-    address: "",
-  });
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isUpdating, setIsUpdating] = useState(false);
+  
+  useEffect(() => {
+    fetchUserProfile();
+  }, []);
+
+  const fetchUserProfile = async () => {
+    try {
+      const response = await axios.get<ApiResponse<UserProfile>>('/api/dashboard/user/profile');
+      if (response.data.success) {
+        setUserProfile(response.data.data);
+      }
+    } catch (error) {
+      console.error('Error fetching user profile:', error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch user profile",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
   
   const handleLogout = async () => {
     try {
@@ -72,13 +112,37 @@ const UserDashboard = () => {
     }
   };
   
-  const handleProfileUpdate = (e: React.FormEvent) => {
+  const handleProfileUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    toast({
-      title: "Profile Updated",
-      description: "Your profile has been updated successfully",
-    });
+    if (!userProfile) return;
+
+    setIsUpdating(true);
+    try {
+      const response = await axios.put<ApiResponse<UserProfile>>('/api/dashboard/user/profile', {
+        full_name: userProfile.full_name,
+        phone: userProfile.phone,
+        address: userProfile.address,
+        city: userProfile.city,
+        state: userProfile.state,
+        country: userProfile.country
+      });
+
+      if (response.data.success) {
+        toast({
+          title: "Profile Updated",
+          description: "Your profile has been updated successfully",
+        });
+      }
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update profile",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUpdating(false);
+    }
   };
   
   const handleViewBooking = (bookingId: string, category: string, institutionId: number) => {
@@ -94,6 +158,16 @@ const UserDashboard = () => {
       return <Badge variant="secondary">Unknown</Badge>;
     }
   };
+
+  if (isLoading) {
+    return (
+      <Layout>
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+        </div>
+      </Layout>
+    );
+  }
   
   return (
     <Layout>
@@ -107,10 +181,18 @@ const UserDashboard = () => {
                   <CardHeader>
                     <div className="flex flex-col items-center">
                       <div className="w-20 h-20 bg-education-100 rounded-full flex items-center justify-center mb-4">
-                        <User className="h-10 w-10 text-education-600" />
+                        {userProfile?.profile_picture_url ? (
+                          <img 
+                            src={userProfile.profile_picture_url} 
+                            alt={userProfile.full_name}
+                            className="w-full h-full rounded-full object-cover"
+                          />
+                        ) : (
+                          <User className="h-10 w-10 text-education-600" />
+                        )}
                       </div>
-                      <CardTitle className="text-xl">{userProfile.name}</CardTitle>
-                      <CardDescription className="text-sm">{userProfile.email}</CardDescription>
+                      <CardTitle className="text-xl">{userProfile?.full_name || user?.name}</CardTitle>
+                      <CardDescription className="text-sm">{userProfile?.email || user?.email}</CardDescription>
                     </div>
                   </CardHeader>
                 </Card>
@@ -213,11 +295,11 @@ const UserDashboard = () => {
                       <form onSubmit={handleProfileUpdate} className="space-y-4">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <div className="space-y-2">
-                            <Label htmlFor="name">Full Name</Label>
+                            <Label htmlFor="full_name">Full Name</Label>
                             <Input 
-                              id="name"
-                              value={userProfile.name}
-                              onChange={(e) => setUserProfile({...userProfile, name: e.target.value})}
+                              id="full_name"
+                              value={userProfile?.full_name || ''}
+                              onChange={(e) => setUserProfile(prev => prev ? {...prev, full_name: e.target.value} : null)}
                             />
                           </div>
                           <div className="space-y-2">
@@ -225,8 +307,7 @@ const UserDashboard = () => {
                             <Input 
                               id="email"
                               type="email"
-                              value={userProfile.email}
-                              onChange={(e) => setUserProfile({...userProfile, email: e.target.value})}
+                              value={userProfile?.email || ''}
                               readOnly
                               disabled
                             />
@@ -235,21 +316,51 @@ const UserDashboard = () => {
                             <Label htmlFor="phone">Phone Number</Label>
                             <Input 
                               id="phone"
-                              value={userProfile.phone}
-                              onChange={(e) => setUserProfile({...userProfile, phone: e.target.value})}
+                              value={userProfile?.phone || ''}
+                              onChange={(e) => setUserProfile(prev => prev ? {...prev, phone: e.target.value} : null)}
                             />
                           </div>
                           <div className="space-y-2">
                             <Label htmlFor="address">Address</Label>
                             <Input 
                               id="address"
-                              value={userProfile.address}
-                              onChange={(e) => setUserProfile({...userProfile, address: e.target.value})}
+                              value={userProfile?.address || ''}
+                              onChange={(e) => setUserProfile(prev => prev ? {...prev, address: e.target.value} : null)}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="city">City</Label>
+                            <Input 
+                              id="city"
+                              value={userProfile?.city || ''}
+                              onChange={(e) => setUserProfile(prev => prev ? {...prev, city: e.target.value} : null)}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="state">State</Label>
+                            <Input 
+                              id="state"
+                              value={userProfile?.state || ''}
+                              onChange={(e) => setUserProfile(prev => prev ? {...prev, state: e.target.value} : null)}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="country">Country</Label>
+                            <Input 
+                              id="country"
+                              value={userProfile?.country || ''}
+                              onChange={(e) => setUserProfile(prev => prev ? {...prev, country: e.target.value} : null)}
                             />
                           </div>
                         </div>
-                        <Button type="submit" className="mt-6">
-                          <Check className="mr-2 h-4 w-4" /> Save Changes
+                        <Button type="submit" className="mt-6" disabled={isUpdating}>
+                          {isUpdating ? (
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                          ) : (
+                            <>
+                              <Check className="mr-2 h-4 w-4" /> Save Changes
+                            </>
+                          )}
                         </Button>
                       </form>
                     )}

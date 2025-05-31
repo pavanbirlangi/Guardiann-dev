@@ -223,7 +223,7 @@ const Auth = () => {
             <Card>
               <CardHeader className="space-y-1">
                 <CardTitle className="text-2xl font-bold text-center">
-                  Welcome to SchoolSeeker
+                  Welcome to Guardiann
                 </CardTitle>
                 <CardDescription className="text-center">
                   Find the best schools, colleges & coaching centers near you.
@@ -613,7 +613,7 @@ const Auth = () => {
                 )}
               </CardContent>
               <CardFooter className="flex flex-wrap items-center justify-between text-sm">
-                <span>© 2025 SchoolSeeker Connect</span>
+                <span>© 2025 Guardiann</span>
                 <div className="flex space-x-4">
                   <a href="#" className="text-education-600 hover:underline">
                     Terms

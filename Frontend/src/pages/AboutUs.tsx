@@ -18,7 +18,7 @@ const AboutUs = () => {
           animate={{ opacity: 1 }}
           transition={{ delay: 0.2, duration: 0.5 }}
         >
-          About SchoolSeeker
+          About Guardiann
         </motion.h1>
 
         <motion.div 
@@ -30,12 +30,12 @@ const AboutUs = () => {
           <div className="prose prose-lg max-w-none">
             <h2 className="text-2xl font-semibold text-education-600 mb-4">Our Mission</h2>
             <p className="mb-6">
-              At SchoolSeeker, we believe that education is the foundation of a thriving society. Our mission is to connect students and parents with the educational institutions that best match their needs, goals, and aspirations.
+              At Guardiann, we believe that education is the foundation of a thriving society. Our mission is to connect students and parents with the educational institutions that best match their needs, goals, and aspirations.
             </p>
             
             <h2 className="text-2xl font-semibold text-education-600 mb-4">Our Story</h2>
             <p className="mb-6">
-              SchoolSeeker was founded in 2023 by a group of education enthusiasts who recognized the challenges faced by students and parents when searching for the right educational institutions. The process was often overwhelming, time-consuming, and lacked transparency.
+            Guardiann was founded in 2023 by a group of education enthusiasts who recognized the challenges faced by students and parents when searching for the right educational institutions. The process was often overwhelming, time-consuming, and lacked transparency.
             </p>
             <p className="mb-6">
               We set out to create a platform that simplifies this journey, providing comprehensive information, easy comparisons, and a streamlined booking process to visit institutions of interest.

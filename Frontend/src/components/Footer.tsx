@@ -10,7 +10,7 @@ const Footer = () => {
           <div>
             <Link to="/" className="inline-block mb-4">
               <span className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-education-600 to-education-400">
-                SchoolSeeker
+                  Guardiann
               </span>
             </Link>
             <p className="text-gray-600 text-sm mb-4">
@@ -69,7 +69,7 @@ const Footer = () => {
             <h3 className="font-semibold mb-4">Contact Us</h3>
             <ul className="space-y-2">
               <li className="text-sm text-gray-600">
-                support@schoolseeker.com
+                support@guardiann.com
               </li>
               <li className="text-sm text-gray-600">
                 +91 99999 88888
@@ -79,7 +79,7 @@ const Footer = () => {
         </div>
 
         <div className="mt-12 pt-6 border-t border-gray-200 text-center text-sm text-gray-500">
-          <p>&copy; {new Date().getFullYear()} SchoolSeeker Connect. All rights reserved.</p>
+          <p>&copy; {new Date().getFullYear()} Guardiann. All rights reserved.</p>
         </div>
       </div>
     </footer>
