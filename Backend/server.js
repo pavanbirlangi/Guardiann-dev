@@ -5,12 +5,15 @@ const swaggerUi = require('swagger-ui-express');
 const swaggerSpecs = require('./config/swagger');
 const authRoutes = require('./routes/authRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
+const categoryRoutes = require('./routes/categoryRoutes');
+const adminRoutes = require('./routes/adminRoutes');
+const institutionRoutes = require('./routes/institutionRoutes');
 
 const app = express();
 
 // Middleware
 app.use(cors({
-  origin: 'http://localhost:8080', // Your frontend URL
+  origin: ['http://localhost:8080', 'http://localhost:5173'], // Allow both Vite and your frontend URLs
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
@@ -34,6 +37,9 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpecs, {
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/categories', categoryRoutes);
+app.use('/api/dashboard/admin', adminRoutes);
+app.use('/api/institutions', institutionRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {

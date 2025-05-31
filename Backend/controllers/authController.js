@@ -52,8 +52,17 @@ const login = async (req, res) => {
 
     const response = await cognitoClient.send(command);
     
-    // Get user role
-    const role = await getUserRole(email);
+    // Get complete user details from Cognito
+    const getUserCommand = new AdminGetUserCommand({
+        UserPoolId: userPoolId,
+        Username: email
+    });
+    const userData = await cognitoClient.send(getUserCommand);
+    
+    // Extract user attributes
+    const name = userData.UserAttributes.find(attr => attr.Name === 'name')?.Value;
+    const role = userData.UserAttributes.find(attr => attr.Name === 'custom:role')?.Value || 'USER';
+    const picture = userData.UserAttributes.find(attr => attr.Name === 'picture')?.Value;
 
     // If MFA is required
     if (response.ChallengeName === 'MFA_SETUP' || response.ChallengeName === 'SOFTWARE_TOKEN_MFA') {
@@ -84,6 +93,8 @@ const login = async (req, res) => {
       },
       user: {
         email,
+        name,
+        picture,
         role
       }
     });

@@ -9,6 +9,7 @@ const {
   ConfirmForgotPasswordCommand
 } = require('@aws-sdk/client-cognito-identity-provider');
 const { cognitoClient, userPoolId, clientId, clientSecret } = require('../config/cognito');
+const { syncUserToRDS } = require('../utils/syncUser');
 const crypto = require('crypto');
 
 // Function to calculate SECRET_HASH
@@ -46,7 +47,31 @@ const register = async (req, res) => {
 
     // Sign up the user
     const signUpCommand = new SignUpCommand(signUpParams);
-    await cognitoClient.send(signUpCommand);
+    const signUpResponse = await cognitoClient.send(signUpCommand);
+
+    // Get user details to get the Cognito sub
+    const getUserCommand = new AdminGetUserCommand({
+      UserPoolId: userPoolId,
+      Username: email
+    });
+    const userDetails = await cognitoClient.send(getUserCommand);
+    const cognitoId = userDetails.UserAttributes.find(attr => attr.Name === 'sub')?.Value;
+
+    if (!cognitoId) {
+      throw new Error('Failed to get Cognito ID for the user');
+    }
+
+    console.log('Attempting to sync user to RDS:', { email, cognitoId });
+
+    // Sync user to RDS
+    try {
+      const syncedUser = await syncUserToRDS(cognitoId, email);
+      console.log('Successfully synced user to RDS:', syncedUser);
+    } catch (syncError) {
+      console.error('Error syncing user to RDS:', syncError);
+      // Continue with the response even if sync fails
+      // The user can still be synced later
+    }
 
     res.status(201).json({
       success: true,

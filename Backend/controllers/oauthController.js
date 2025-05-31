@@ -5,29 +5,17 @@ const {
 } = require('@aws-sdk/client-cognito-identity-provider');
 const { cognitoClient, userPoolId, clientId } = require('../config/cognito');
 const crypto = require('crypto');
+const { syncUserToRDS } = require('../utils/syncUser');
 
-// Helper function to generate a secure password that meets Cognito requirements
+// Helper function to generate a secure password
 const generateSecurePassword = () => {
-    const uppercase = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-    const lowercase = 'abcdefghijklmnopqrstuvwxyz';
-    const numbers = '0123456789';
-    const special = '!@#$%^&*()_+-=[]{}|;:,.<>?';
-    
-    // Ensure at least one character from each required set
-    let password = '';
-    password += uppercase[Math.floor(Math.random() * uppercase.length)];
-    password += lowercase[Math.floor(Math.random() * lowercase.length)];
-    password += numbers[Math.floor(Math.random() * numbers.length)];
-    password += special[Math.floor(Math.random() * special.length)];
-    
-    // Add more random characters to meet minimum length
-    const allChars = uppercase + lowercase + numbers + special;
-    for (let i = 0; i < 8; i++) {
-        password += allChars[Math.floor(Math.random() * allChars.length)];
+    const length = 16;
+    const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+";
+    let password = "";
+    for (let i = 0; i < length; i++) {
+        password += charset.charAt(Math.floor(Math.random() * charset.length));
     }
-    
-    // Shuffle the password
-    return password.split('').sort(() => Math.random() - 0.5).join('');
+    return password;
 };
 
 // Helper function to get user role from Cognito
@@ -86,13 +74,16 @@ const handleGoogleCallback = async (req, res) => {
         const userInfo = await userInfoResponse.json();
         const { email, name, picture } = userInfo;
 
+        let cognitoId;
+
         // Check if user exists in Cognito
         try {
             const getUserCommand = new AdminGetUserCommand({
                 UserPoolId: userPoolId,
                 Username: email
             });
-            await cognitoClient.send(getUserCommand);
+            const cognitoUser = await cognitoClient.send(getUserCommand);
+            cognitoId = cognitoUser.UserAttributes.find(attr => attr.Name === 'sub')?.Value;
         } catch (error) {
             // If user doesn't exist, create new user
             if (error.name === 'UserNotFoundException') {
@@ -128,7 +119,8 @@ const handleGoogleCallback = async (req, res) => {
                     TemporaryPassword: securePassword
                 });
 
-                await cognitoClient.send(createUserCommand);
+                const createUserResponse = await cognitoClient.send(createUserCommand);
+                cognitoId = createUserResponse.User.Attributes.find(attr => attr.Name === 'sub')?.Value;
 
                 // Set the permanent password immediately to avoid force change password
                 const setPasswordCommand = new AdminSetUserPasswordCommand({
@@ -139,7 +131,23 @@ const handleGoogleCallback = async (req, res) => {
                 });
 
                 await cognitoClient.send(setPasswordCommand);
+            } else {
+                throw error;
             }
+        }
+
+        if (!cognitoId) {
+            throw new Error('Failed to get or create Cognito user ID');
+        }
+
+        // Sync user to RDS
+        try {
+            console.log('Syncing Google user to RDS:', { email, cognitoId });
+            await syncUserToRDS(cognitoId, email);
+        } catch (syncError) {
+            console.error('Error syncing Google user to RDS:', syncError);
+            // Continue with the response even if sync fails
+            // The user can still be synced later
         }
 
         // Get user role
