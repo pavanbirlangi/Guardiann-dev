@@ -1,4 +1,3 @@
-
 import React from "react";
 import { Phone, Mail, Globe, Clock } from "lucide-react";
 
@@ -10,9 +9,25 @@ interface AboutTabProps {
     email: string;
     website: string;
   };
+  visiting_hours?: Array<{
+    day: string;
+    start_time: string;
+    end_time: string;
+  }>;
 }
 
-const AboutTab: React.FC<AboutTabProps> = ({ name, description, contact }) => {
+const AboutTab: React.FC<AboutTabProps> = ({ name, description, contact, visiting_hours = [] }) => {
+  const formatTime = (time: string) => {
+    try {
+      const [hours, minutes] = time.split(':');
+      const date = new Date();
+      date.setHours(parseInt(hours), parseInt(minutes));
+      return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+    } catch (err) {
+      return time;
+    }
+  };
+
   return (
     <div className="bg-white p-6 rounded-lg shadow-sm">
       <h2 className="text-2xl font-semibold mb-4">About {name}</h2>
@@ -42,18 +57,19 @@ const AboutTab: React.FC<AboutTabProps> = ({ name, description, contact }) => {
         <div className="bg-gray-50 p-4 rounded-lg">
           <h3 className="font-semibold mb-3">Visiting Hours</h3>
           <div className="space-y-2">
-            <div className="flex items-center">
-              <Clock className="w-4 h-4 mr-2 text-education-600" />
-              <span>Monday - Friday: 9:00 AM - 5:00 PM</span>
-            </div>
-            <div className="flex items-center">
-              <Clock className="w-4 h-4 mr-2 text-education-600" />
-              <span>Saturday: 9:00 AM - 1:00 PM</span>
-            </div>
-            <div className="flex items-center">
-              <Clock className="w-4 h-4 mr-2 text-education-600" />
-              <span>Sunday: Closed</span>
-            </div>
+            {visiting_hours.length > 0 ? (
+              visiting_hours.map((hour, index) => (
+                <div key={index} className="flex items-center">
+                  <Clock className="w-4 h-4 mr-2 text-education-600" />
+                  <span>{hour.day}: {formatTime(hour.start_time)} - {formatTime(hour.end_time)}</span>
+                </div>
+              ))
+            ) : (
+              <div className="flex items-center">
+                <Clock className="w-4 h-4 mr-2 text-education-600" />
+                <span>Visiting hours not specified</span>
+              </div>
+            )}
           </div>
         </div>
       </div>

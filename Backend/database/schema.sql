@@ -131,7 +131,7 @@ DROP TRIGGER IF EXISTS generate_booking_id_trigger ON bookings;
 CREATE TRIGGER generate_booking_id_trigger
 BEFORE INSERT ON bookings
 FOR EACH ROW
-EXECUTE FUNCTION generate_booking_id();
+EXECUTE FUNCTION generate_booking_id(); 
 
 -- Drop existing tables that are no longer needed
 DROP TABLE IF EXISTS institution_images CASCADE;

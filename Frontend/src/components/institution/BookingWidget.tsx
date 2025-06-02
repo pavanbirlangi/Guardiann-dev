@@ -1,4 +1,3 @@
-
 import React from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -11,6 +10,12 @@ interface BookingWidgetProps {
 }
 
 const BookingWidget: React.FC<BookingWidgetProps> = ({ institution, category, id }) => {
+  const formatAmount = (amount: string | number) => {
+    if (!amount) return '0';
+    const numAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
+    return isNaN(numAmount) ? '0' : numAmount.toLocaleString();
+  };
+
   return (
     <div className="bg-white p-6 rounded-lg shadow-sm relative z-30">
       <h2 className="text-xl font-semibold mb-4">Book a Visit</h2>
@@ -20,7 +25,7 @@ const BookingWidget: React.FC<BookingWidgetProps> = ({ institution, category, id
       
       <div className="bg-gray-50 p-4 rounded-lg mb-6">
         <h3 className="font-medium mb-3">Booking Fee</h3>
-        <p className="text-2xl font-bold text-education-700">₹2,000</p>
+        <p className="text-2xl font-bold text-education-700">₹{formatAmount(institution.booking_amount)}</p>
         <p className="text-sm text-gray-600 mt-1">
           This amount is adjustable against admission fees.
         </p>

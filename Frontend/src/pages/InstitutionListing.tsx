@@ -4,13 +4,13 @@ import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Search, Filter, Check } from "lucide-react";
 import { toast } from "sonner";
+import axios from "axios";
 
-const categoryTitles = {
-  schools: "Schools",
-  colleges: "Colleges",
-  coaching: "Coaching Centers",
-  "pg-colleges": "Postgraduate Colleges"
-};
+interface Category {
+  id: string;
+  name: string;
+  slug: string;
+}
 
 const InstitutionListing = () => {
   const { category } = useParams<{category: string}>();
@@ -20,22 +20,47 @@ const InstitutionListing = () => {
   const [institutions, setInstitutions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [categoryData, setCategoryData] = useState<Category | null>(null);
+
+  useEffect(() => {
+    const fetchCategory = async () => {
+      try {
+        const response = await axios.get<{ success: boolean; data: Category[] }>(
+          `${import.meta.env.VITE_API_URL}/categories`
+        );
+        
+        if (response.data.success && Array.isArray(response.data.data)) {
+          const foundCategory = response.data.data.find(cat => cat.slug === category);
+          if (foundCategory) {
+            setCategoryData(foundCategory);
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching category:', err);
+      }
+    };
+
+    if (category) {
+      fetchCategory();
+    }
+  }, [category]);
 
   useEffect(() => {
     const fetchInstitutions = async () => {
       try {
         setLoading(true);
         setError(null);
-        const response = await fetch(`${import.meta.env.VITE_API_URL}/institutions/list/${category}`);
-        const data = await response.json();
+        const response = await axios.get<{ success: boolean; data: any[]; message?: string }>(
+          `${import.meta.env.VITE_API_URL}/institutions/list/${category}`
+        );
         
-        if (!response.ok) {
-          throw new Error(data.message || 'Failed to fetch institutions');
+        if (response.data.success) {
+          setInstitutions(response.data.data || []);
+        } else {
+          throw new Error(response.data.message || 'Failed to fetch institutions');
         }
-
-        setInstitutions(data.data || []);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to fetch institutions');
+      } catch (err: any) {
+        setError(err.response?.data?.message || err.message || 'Failed to fetch institutions');
         toast.error('Failed to fetch institutions');
       } finally {
         setLoading(false);
@@ -47,7 +72,7 @@ const InstitutionListing = () => {
     }
   }, [category]);
 
-  if (!category || !categoryTitles[category as keyof typeof categoryTitles]) {
+  if (!category || !categoryData) {
     return (
       <Layout>
         <div className="container py-12 text-center">
@@ -61,7 +86,7 @@ const InstitutionListing = () => {
     );
   }
 
-  const categoryTitle = categoryTitles[category as keyof typeof categoryTitles] || "Institutions";
+  const categoryTitle = categoryData.name;
 
   // Extract unique cities and types for filters
   const cities = [...new Set(institutions.map(inst => inst.city))];

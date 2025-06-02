@@ -3,11 +3,13 @@ const express = require('express');
 const cors = require('cors');
 const swaggerUi = require('swagger-ui-express');
 const swaggerSpecs = require('./config/swagger');
+const { pool } = require('./config/database');
 const authRoutes = require('./routes/authRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
 const categoryRoutes = require('./routes/categoryRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const institutionRoutes = require('./routes/institutionRoutes');
+const uploadRoutes = require('./routes/uploadRoutes');
 
 const app = express();
 
@@ -27,6 +29,21 @@ app.use((req, res, next) => {
   next();
 });
 
+// Health check endpoint
+app.get('/health', async (req, res) => {
+  try {
+    await pool.query('SELECT NOW()');
+    res.json({ status: 'healthy', database: 'connected' });
+  } catch (error) {
+    console.error('Health check failed:', error);
+    res.status(500).json({ 
+      status: 'unhealthy', 
+      database: 'disconnected',
+      error: error.message 
+    });
+  }
+});
+
 // Swagger Documentation
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpecs, {
   explorer: true,
@@ -40,10 +57,21 @@ app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/dashboard/admin', adminRoutes);
 app.use('/api/institutions', institutionRoutes);
+app.use('/api/upload', uploadRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error('Error:', err);
+  
+  // Handle database connection errors
+  if (err.code === 'ETIMEDOUT' || err.code === 'ECONNREFUSED') {
+    return res.status(503).json({
+      success: false,
+      message: 'Database connection error. Please try again later.',
+      error: err.message
+    });
+  }
+
   res.status(500).json({
     success: false,
     message: 'Internal server error',
@@ -61,6 +89,15 @@ app.use((req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
+
+// Graceful shutdown
+process.on('SIGTERM', () => {
+  console.log('SIGTERM received. Closing database pool...');
+  pool.end(() => {
+    console.log('Database pool closed');
+    process.exit(0);
+  });
+});
 
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);

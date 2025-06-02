@@ -73,7 +73,9 @@ const { v4: uuidv4 } = require('uuid');
  *             properties:
  *               day:
  *                 type: string
- *               hours:
+ *               start_time:
+ *                 type: string
+ *               end_time:
  *                 type: string
  *         type:
  *           type: string
@@ -360,7 +362,11 @@ const createInstitution = async (req, res) => {
 
         // Ensure JSON fields are properly formatted
         const galleryArray = Array.isArray(gallery) ? gallery : [];
-        const visitingHoursArray = Array.isArray(visiting_hours) ? visiting_hours : [];
+        const visitingHoursArray = Array.isArray(visiting_hours) ? visiting_hours.map(hour => ({
+            day: hour.day,
+            start_time: hour.start_time,
+            end_time: hour.end_time
+        })) : [];
         const coursesArray = Array.isArray(courses) ? courses : [];
         const infrastructureArray = Array.isArray(infrastructure) ? infrastructure : [];
         const contactObj = typeof contact === 'object' ? contact : {};
@@ -527,7 +533,11 @@ const updateInstitution = async (req, res) => {
 
         // Ensure JSON fields are properly formatted
         const galleryArray = Array.isArray(gallery) ? gallery : [];
-        const visitingHoursArray = Array.isArray(visiting_hours) ? visiting_hours : [];
+        const visitingHoursArray = Array.isArray(visiting_hours) ? visiting_hours.map(hour => ({
+            day: hour.day,
+            start_time: hour.start_time,
+            end_time: hour.end_time
+        })) : [];
         const coursesArray = Array.isArray(courses) ? courses : [];
         const infrastructureArray = Array.isArray(infrastructure) ? infrastructure : [];
         const contactObj = typeof contact === 'object' ? contact : {};
