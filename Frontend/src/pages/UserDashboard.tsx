@@ -13,45 +13,22 @@ import { Calendar, Check, Download, User } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import axios from "axios";
 
-// Mock booking data
-const mockBookings = [
-  {
-    id: "SSC12345",
-    institutionName: "Greenfield International School",
-    category: "schools",
-    institutionId: 1,
-    status: "confirmed",
-    bookingDate: "2025-05-07",
-    visitDate: "2025-05-10",
-    visitTime: "10:00 AM",
-    amount: "₹2,000",
-    thumbnail: "https://images.unsplash.com/photo-1613896640137-bb5b31496315?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80",
-  },
-  {
-    id: "SSC34567",
-    institutionName: "National Institute of Technology",
-    category: "colleges",
-    institutionId: 1,
-    status: "pending",
-    bookingDate: "2025-05-06",
-    visitDate: "2025-05-12",
-    visitTime: "02:00 PM",
-    amount: "₹2,000",
-    thumbnail: "https://images.unsplash.com/photo-1607237138185-eedd9c632b0b?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80",
-  },
-  {
-    id: "SSC56789",
-    institutionName: "Indian Institute of Management",
-    category: "pg-colleges",
-    institutionId: 1,
-    status: "confirmed",
-    bookingDate: "2025-04-30",
-    visitDate: "2025-05-15",
-    visitTime: "11:30 AM",
-    amount: "₹2,000",
-    thumbnail: "https://images.unsplash.com/photo-1541339907198-e08756dedf3f?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80",
-  },
-];
+interface Booking {
+  id: string;
+  booking_id: string;
+  institution_id: string;
+  institution_name: string;
+  thumbnail_url: string;
+  category_name: string;
+  status: string;
+  booking_date: string;
+  visit_date: string;
+  visit_time: string;
+  amount: string;
+  visitor_name: string;
+  visitor_email: string;
+  visitor_phone: string;
+}
 
 interface UserProfile {
   id: string;
@@ -73,6 +50,8 @@ interface ApiResponse<T> {
   data: T;
 }
 
+const DEFAULT_THUMBNAIL = 'https://placehold.co/96x96?text=No+Image';
+
 const UserDashboard = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -81,26 +60,57 @@ const UserDashboard = () => {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [bookings, setBookings] = useState<Booking[]>([]);
+  const [bookingsLoading, setBookingsLoading] = useState(true);
   
   useEffect(() => {
     fetchUserProfile();
+    fetchUserBookings();
   }, []);
 
   const fetchUserProfile = async () => {
+    setIsLoading(true);
     try {
-      const response = await axios.get<ApiResponse<UserProfile>>('/api/dashboard/user/profile');
+      const token = localStorage.getItem('accessToken');
+      const response = await axios.get<ApiResponse<UserProfile>>(
+        `${import.meta.env.VITE_API_URL}/dashboard/user/data`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
       if (response.data.success) {
         setUserProfile(response.data.data);
       }
     } catch (error) {
       console.error('Error fetching user profile:', error);
       toast({
-        title: "Error",
-        description: "Failed to fetch user profile",
-        variant: "destructive",
+        title: 'Error',
+        description: 'Failed to fetch user profile',
+        variant: 'destructive',
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const fetchUserBookings = async () => {
+    setBookingsLoading(true);
+    try {
+      const token = localStorage.getItem('accessToken');
+      const response = await axios.get<ApiResponse<Booking[]>>(
+        `${import.meta.env.VITE_API_URL}/dashboard/user/bookings`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (response.data.success) {
+        setBookings(response.data.data);
+      }
+    } catch (error) {
+      console.error('Error fetching bookings:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to fetch bookings',
+        variant: 'destructive',
+      });
+    } finally {
+      setBookingsLoading(false);
     }
   };
   
@@ -115,37 +125,40 @@ const UserDashboard = () => {
   const handleProfileUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!userProfile) return;
-
     setIsUpdating(true);
     try {
-      const response = await axios.put<ApiResponse<UserProfile>>('/api/dashboard/user/profile', {
-        full_name: userProfile.full_name,
-        phone: userProfile.phone,
-        address: userProfile.address,
-        city: userProfile.city,
-        state: userProfile.state,
-        country: userProfile.country
-      });
-
+      const token = localStorage.getItem('accessToken');
+      const response = await axios.put<ApiResponse<UserProfile>>(
+        `${import.meta.env.VITE_API_URL}/dashboard/user/data`,
+        {
+          full_name: userProfile.full_name,
+          phone: userProfile.phone,
+          address: userProfile.address,
+          city: userProfile.city,
+          state: userProfile.state,
+          country: userProfile.country,
+        },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
       if (response.data.success) {
         toast({
-          title: "Profile Updated",
-          description: "Your profile has been updated successfully",
+          title: 'Profile Updated',
+          description: 'Your profile has been updated successfully',
         });
       }
     } catch (error) {
       console.error('Error updating profile:', error);
       toast({
-        title: "Error",
-        description: "Failed to update profile",
-        variant: "destructive",
+        title: 'Error',
+        description: 'Failed to update profile',
+        variant: 'destructive',
       });
     } finally {
       setIsUpdating(false);
     }
   };
   
-  const handleViewBooking = (bookingId: string, category: string, institutionId: number) => {
+  const handleViewBooking = (bookingId: string, category: string, institutionId: string) => {
     navigate(`/booking-confirmation/${category}/${institutionId}`);
   };
   
@@ -239,31 +252,48 @@ const UserDashboard = () => {
                   <CardContent>
                     {activeTab === "bookings" ? (
                       <div>
-                        {mockBookings.length > 0 ? (
+                        {bookingsLoading ? (
+                          <div className="text-center py-8">
+                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto mb-4"></div>
+                            <p>Loading bookings...</p>
+                          </div>
+                        ) : bookings.length > 0 ? (
                           <div className="space-y-4">
-                            {mockBookings.map((booking) => (
+                            {bookings.map((booking) => (
                               <div key={booking.id} className="border rounded-lg p-4">
                                 <div className="flex flex-col md:flex-row gap-4">
-                                  <img
-                                    src={booking.thumbnail}
-                                    alt={booking.institutionName}
-                                    className="w-full md:w-24 h-24 object-cover rounded"
-                                  />
+                                  <div className="w-full md:w-24 h-24 relative">
+                                    <img
+                                      src={booking.thumbnail_url || DEFAULT_THUMBNAIL}
+                                      alt={booking.institution_name}
+                                      className="w-full h-full object-cover rounded"
+                                      onError={(e) => {
+                                        const target = e.target as HTMLImageElement;
+                                        target.src = DEFAULT_THUMBNAIL;
+                                      }}
+                                    />
+                                  </div>
                                   <div className="flex-1">
                                     <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-2">
-                                      <h3 className="font-semibold text-lg">{booking.institutionName}</h3>
+                                      <div>
+                                        <h3 className="font-semibold text-lg">{booking.institution_name}</h3>
+                                        <p className="text-sm text-gray-500">{booking.category_name}</p>
+                                      </div>
                                       {getStatusBadge(booking.status)}
                                     </div>
                                     <div className="text-sm text-gray-600 mb-2">
-                                      <p><span className="font-medium">Booking ID:</span> {booking.id}</p>
-                                      <p><span className="font-medium">Visit Date:</span> {booking.visitDate} at {booking.visitTime}</p>
-                                      <p><span className="font-medium">Amount:</span> {booking.amount}</p>
+                                      <p><span className="font-medium">Booking ID:</span> {booking.booking_id}</p>
+                                      <p><span className="font-medium">Visit Date:</span> {booking.visit_date} at {booking.visit_time}</p>
+                                      <p><span className="font-medium">Amount:</span> ₹{booking.amount}</p>
+                                      {booking.visitor_name && (
+                                        <p><span className="font-medium">Visitor:</span> {booking.visitor_name}</p>
+                                      )}
                                     </div>
                                     <div className="flex flex-wrap gap-2 mt-3">
                                       <Button
                                         size="sm"
                                         className="flex items-center gap-1"
-                                        onClick={() => handleViewBooking(booking.id, booking.category, booking.institutionId)}
+                                        onClick={() => handleViewBooking(booking.booking_id, booking.category_name, booking.institution_id)}
                                       >
                                         View Details
                                       </Button>

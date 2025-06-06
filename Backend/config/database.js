@@ -7,21 +7,12 @@ const pool = new Pool({
     database: process.env.DB_NAME,
     password: process.env.DB_PASSWORD,
     port: process.env.DB_PORT || 5432,
-    // set to production state when deploying to AWS
-    ssl: {
-        rejectUnauthorized: false
-    },
-    // Connection settings
-    connectionTimeoutMillis: 0, // No timeout for initial connection
-    idleTimeoutMillis: 0, // Keep idle connections alive
-    max: 20, // Maximum number of clients in the pool
-    min: 4, // Minimum number of clients in the pool
-    allowExitOnIdle: false, // Don't close connections when idle
-    keepAlive: true, // Enable keep-alive
-    keepAliveInitialDelayMillis: 10000, // Start keep-alive after 10 seconds
-    // Connection retry settings
-    maxRetries: 5, // Maximum number of retries
-    retryInterval: 5000, // Retry every 5 seconds
+    ssl: { rejectUnauthorized: false },
+    connectionTimeoutMillis: 5000,    // Wait up to 5 seconds for a connection
+    idleTimeoutMillis: 30000,         // Disconnect idle clients after 30 seconds
+    max: 20,                          // Maximum number of clients in the pool
+    min: 4,                           // Minimum number of clients in the pool
+    allowExitOnIdle: false            // Don't exit the process when idle
 });
 
 // Function to test database connection
@@ -38,37 +29,32 @@ const testConnection = async () => {
     }
 };
 
-// Function to handle reconnection
+// Function to handle reconnection attempts
 const handleReconnect = async () => {
     console.log('Attempting to reconnect to database...');
-    let retries = 0;
     const maxRetries = 5;
+    let retries = 0;
 
     while (retries < maxRetries) {
-        try {
-            const isConnected = await testConnection();
-            if (isConnected) {
-                console.log('Successfully reconnected to database');
-                return true;
-            }
-        } catch (err) {
-            console.error(`Reconnection attempt ${retries + 1} failed:`, err);
+        if (await testConnection()) {
+            console.log('Successfully reconnected to database');
+            return true;
         }
         retries++;
-        await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds between retries
+        console.log(`Reconnection attempt ${retries} failed, retrying in 5 seconds...`);
+        await new Promise(resolve => setTimeout(resolve, 5000));
     }
     console.error('Failed to reconnect to database after', maxRetries, 'attempts');
     return false;
 };
 
-// Add error handling for the pool
+// Pool Event Listeners
 pool.on('error', async (err, client) => {
-    console.error('Unexpected error on idle client', err);
-    // Don't exit the process, try to reconnect instead
+    console.error('Unexpected error on idle client:', err);
+    // Optionally trigger reconnection attempts
     await handleReconnect();
 });
 
-// Add connection monitoring
 pool.on('connect', () => {
     console.log('New database connection established');
 });
@@ -88,15 +74,15 @@ testConnection().then(isConnected => {
     }
 });
 
-// Periodic connection check
-setInterval(async () => {
-    const isConnected = await testConnection();
-    if (!isConnected) {
-        await handleReconnect();
-    }
-}, 30000); // Check every 30 seconds
+// Optional periodic connection check (adjust or remove in production to avoid unnecessary load)
+// setInterval(async () => {
+//     const isConnected = await testConnection();
+//     if (!isConnected) {
+//         await handleReconnect();
+//     }
+// }, 30000); // Checks every 30 seconds
 
-// Graceful shutdown
+// Graceful shutdown on SIGTERM
 process.on('SIGTERM', async () => {
     console.log('SIGTERM received. Closing database pool...');
     try {
@@ -108,16 +94,13 @@ process.on('SIGTERM', async () => {
     process.exit(0);
 });
 
+// Exporting the query and client retrieval methods
 module.exports = {
     query: async (text, params) => {
         try {
             return await pool.query(text, params);
         } catch (err) {
-            if (err.code === 'ETIMEDOUT' || err.code === 'ECONNREFUSED') {
-                await handleReconnect();
-                // Retry the query after reconnection
-                return await pool.query(text, params);
-            }
+            console.error('Query error:', err);
             throw err;
         }
     },
@@ -125,14 +108,10 @@ module.exports = {
         try {
             return await pool.connect();
         } catch (err) {
-            if (err.code === 'ETIMEDOUT' || err.code === 'ECONNREFUSED') {
-                await handleReconnect();
-                // Retry getting client after reconnection
-                return await pool.connect();
-            }
+            console.error('Error acquiring client:', err);
             throw err;
         }
     },
     pool,
     testConnection
-}; 
+};

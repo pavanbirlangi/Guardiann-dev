@@ -1,5 +1,8 @@
 const { query } = require('../config/database');
+const { validationResult } = require('express-validator');
+const pool = require('../config/database');
 const { v4: uuidv4 } = require('uuid');
+const PDFDocument = require('pdfkit');
 
 // Helper function to generate slug from name
 const generateSlug = (name) => {
@@ -210,9 +213,176 @@ const deleteCategory = async (req, res) => {
     }
 };
 
+/**
+ * Get all bookings with filtering options
+ */
+const getAllBookings = async (req, res) => {
+    try {
+        const { status, category, search } = req.query;
+        let query = `
+            SELECT 
+                b.booking_id,
+                b.visitor_name,
+                b.visitor_email,
+                b.visitor_phone,
+                b.booking_date,
+                b.visit_date,
+                b.visit_time,
+                b.amount,
+                b.status,
+                b.payment_id,
+                i.name as institution_name,
+                c.name as category_name
+            FROM bookings b
+            JOIN institutions i ON b.institution_id = i.id
+            JOIN categories c ON i.category_id = c.id
+            WHERE 1=1
+        `;
+        const params = [];
+
+        if (status && status !== 'all') {
+            query += ` AND b.status = $${params.length + 1}`;
+            params.push(status);
+        }
+
+        if (category && category !== 'all') {
+            query += ` AND c.name = $${params.length + 1}`;
+            params.push(category);
+        }
+
+        if (search) {
+            query += ` AND (
+                b.visitor_name ILIKE $${params.length + 1} OR
+                i.name ILIKE $${params.length + 1} OR
+                b.booking_id ILIKE $${params.length + 1}
+            )`;
+            params.push(`%${search}%`);
+        }
+
+        query += ` ORDER BY b.booking_date DESC`;
+
+        const result = await pool.query(query, params);
+        res.json({
+            success: true,
+            data: result.rows
+        });
+    } catch (error) {
+        console.error('Error fetching bookings:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to fetch bookings'
+        });
+    }
+};
+
+/**
+ * Update booking status
+ */
+const updateBookingStatus = async (req, res) => {
+    try {
+        const { bookingId } = req.params;
+        const { status } = req.body;
+
+        if (!['pending', 'confirmed', 'cancelled'].includes(status)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid status'
+            });
+        }
+
+        const result = await pool.query(
+            'UPDATE bookings SET status = $1 WHERE booking_id = $2 RETURNING *',
+            [status, bookingId]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: 'Booking not found'
+            });
+        }
+
+        res.json({
+            success: true,
+            message: 'Booking status updated successfully',
+            data: result.rows[0]
+        });
+    } catch (error) {
+        console.error('Error updating booking status:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to update booking status'
+        });
+    }
+};
+
+/**
+ * Generate and download booking receipt
+ */
+const downloadBookingReceipt = async (req, res) => {
+    try {
+        const { bookingId } = req.params;
+
+        const result = await pool.query(`
+            SELECT 
+                b.*,
+                i.name as institution_name,
+                i.address as institution_address,
+                i.city as institution_city,
+                i.state as institution_state
+            FROM bookings b
+            JOIN institutions i ON b.institution_id = i.id
+            WHERE b.booking_id = $1
+        `, [bookingId]);
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: 'Booking not found'
+            });
+        }
+
+        const booking = result.rows[0];
+
+        // Create PDF
+        const doc = new PDFDocument();
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename=receipt-${bookingId}.pdf`);
+
+        doc.pipe(res);
+
+        // Add content to PDF
+        doc.fontSize(20).text('Booking Receipt', { align: 'center' });
+        doc.moveDown();
+        doc.fontSize(12).text(`Booking ID: ${booking.booking_id}`);
+        doc.text(`Institution: ${booking.institution_name}`);
+        doc.text(`Visitor: ${booking.visitor_name}`);
+        doc.text(`Email: ${booking.visitor_email}`);
+        doc.text(`Phone: ${booking.visitor_phone}`);
+        doc.text(`Visit Date: ${booking.visit_date}`);
+        doc.text(`Visit Time: ${booking.visit_time}`);
+        doc.text(`Amount: ₹${booking.amount}`);
+        doc.text(`Status: ${booking.status}`);
+        doc.text(`Payment ID: ${booking.payment_id}`);
+        doc.moveDown();
+        doc.text(`Institution Address: ${booking.institution_address}, ${booking.institution_city}, ${booking.institution_state}`);
+
+        doc.end();
+    } catch (error) {
+        console.error('Error generating receipt:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to generate receipt'
+        });
+    }
+};
+
 module.exports = {
     getAllCategories,
     addCategory,
     updateCategory,
-    deleteCategory
+    deleteCategory,
+    getAllBookings,
+    updateBookingStatus,
+    downloadBookingReceipt
 }; 

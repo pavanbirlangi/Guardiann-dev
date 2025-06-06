@@ -1021,18 +1021,18 @@ const InstitutionsManagement = () => {
                     id="type"
                     value={formData.type}
                     onChange={(e) => setFormData(prev => ({ ...prev, type: e.target.value }))}
-                    className="col-span-3"
-                  />
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="description" className="text-right">Description</Label>
-                  <Textarea
-                    id="description"
-                    value={formData.description}
-                    onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                    className="col-span-3"
-                  />
-                </div>
+                  className="col-span-3"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="description" className="text-right">Description</Label>
+                <Textarea
+                  id="description"
+                  value={formData.description}
+                  onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                  className="col-span-3"
+                />
+              </div>
                 <div className="grid grid-cols-4 items-center gap-4">
                   <Label htmlFor="thumbnail" className="text-right">Thumbnail Image</Label>
                   <div className="col-span-3 space-y-2">
@@ -1122,21 +1122,21 @@ const InstitutionsManagement = () => {
                       )}
                     </div>
                   </div>
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="status" className="text-right">Status</Label>
-                  <Select 
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="status" className="text-right">Status</Label>
+                <Select 
                     value={formData.is_active ? "active" : "inactive"} 
                     onValueChange={(value) => setFormData(prev => ({ ...prev, is_active: value === "active" }))}
-                  >
-                    <SelectTrigger className="col-span-3">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="active">Active</SelectItem>
-                      <SelectItem value="inactive">Inactive</SelectItem>
-                    </SelectContent>
-                  </Select>
+                >
+                  <SelectTrigger className="col-span-3">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="inactive">Inactive</SelectItem>
+                  </SelectContent>
+                </Select>
                 </div>
               </div>
             </div>
@@ -1158,70 +1158,70 @@ const InstitutionsManagement = () => {
           </div>
         ) : (
           institutions.map((institution, index) => (
-            <motion.div
-              key={institution.id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: index * 0.1 }}
-            >
-              <Card>
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-2">
-                        <CardTitle>{institution.name}</CardTitle>
+          <motion.div
+            key={institution.id}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: index * 0.1 }}
+          >
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3 mb-2">
+                      <CardTitle>{institution.name}</CardTitle>
                         <Badge 
                           variant={institution.is_active ? "default" : "destructive"}
                           className="capitalize"
                         >
                           {institution.is_active ? "Active" : "Inactive"}
-                        </Badge>
-                      </div>
-                      <CardDescription className="flex items-center gap-4">
-                        <span className="flex items-center gap-1">
-                          <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                          {institution.rating}
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <MapPin className="h-4 w-4" />
-                          {institution.address}
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <Phone className="h-4 w-4" />
+                      </Badge>
+                    </div>
+                    <CardDescription className="flex items-center gap-4">
+                      <span className="flex items-center gap-1">
+                        <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                        {institution.rating}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <MapPin className="h-4 w-4" />
+                        {institution.address}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <Phone className="h-4 w-4" />
                           {institution.contact?.phone || 'Not provided'}
-                        </span>
-                      </CardDescription>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button 
-                        size="sm" 
-                        variant="outline"
-                        onClick={() => handleEdit(institution)}
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button 
-                        size="sm" 
-                        variant="outline"
-                        onClick={() => handleDelete(institution.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
+                      </span>
+                    </CardDescription>
                   </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div>
-                      <p className="text-sm text-gray-600 mb-1">Category</p>
+                  <div className="flex gap-2">
+                    <Button 
+                      size="sm" 
+                      variant="outline"
+                      onClick={() => handleEdit(institution)}
+                    >
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                    <Button 
+                      size="sm" 
+                      variant="outline"
+                      onClick={() => handleDelete(institution.id)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <p className="text-sm text-gray-600 mb-1">Category</p>
                       <p className="font-medium capitalize">{institution.category_name || 'Not specified'}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-600 mb-1">Booking Amount</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600 mb-1">Booking Amount</p>
                       <p className="font-medium">₹{parseFloat(institution.booking_amount).toLocaleString()}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-600 mb-1">Description</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600 mb-1">Description</p>
                       <div 
                         className="text-sm relative group"
                         title={institution.description}
@@ -1235,11 +1235,11 @@ const InstitutionsManagement = () => {
                           </span>
                         )}
                       </div>
-                    </div>
                   </div>
-                </CardContent>
-              </Card>
-            </motion.div>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
           ))
         )}
       </div>

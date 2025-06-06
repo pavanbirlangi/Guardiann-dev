@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -15,111 +15,85 @@ import {
 } from "@/components/ui/table";
 import { Download, Eye, Search, Filter, Calendar } from "lucide-react";
 import { toast } from "sonner";
+import { useQuery } from '@tanstack/react-query';
+import { api } from '@/lib/api';
+
+interface Booking {
+  booking_id: string;
+  institution_name: string;
+  visitor_name: string;
+  visitor_email: string;
+  visitor_phone: string;
+  booking_date: string;
+  visit_date: string;
+  visit_time: string;
+  amount: number;
+  status: string;
+  payment_id: string;
+  category_name: string;
+}
+
+interface ApiResponse {
+  success: boolean;
+  data: Booking[];
+}
 
 const BookingsManagement = () => {
-  const [bookings, setBookings] = useState([
-    {
-      id: "BK001",
-      institutionName: "Delhi Public School",
-      studentName: "Rahul Sharma",
-      email: "rahul@example.com",
-      phone: "+91 98765 43210",
-      bookingDate: "2024-01-15",
-      visitDate: "2024-01-20",
-      amount: 2000,
-      status: "confirmed",
-      paymentId: "PAY_001",
-      category: "schools"
-    },
-    {
-      id: "BK002",
-      institutionName: "IIT Delhi",
-      studentName: "Priya Patel",
-      email: "priya@example.com",
-      phone: "+91 98765 43211",
-      bookingDate: "2024-01-16",
-      visitDate: "2024-01-22",
-      amount: 2000,
-      status: "pending",
-      paymentId: "PAY_002",
-      category: "colleges"
-    },
-    {
-      id: "BK003",
-      institutionName: "AIIMS Delhi",
-      studentName: "Amit Kumar",
-      email: "amit@example.com",
-      phone: "+91 98765 43212",
-      bookingDate: "2024-01-17",
-      visitDate: "2024-01-25",
-      amount: 2000,
-      status: "confirmed",
-      paymentId: "PAY_003",
-      category: "colleges"
-    },
-    {
-      id: "BK004",
-      institutionName: "Aakash Institute",
-      studentName: "Sneha Singh",
-      email: "sneha@example.com",
-      phone: "+91 98765 43213",
-      bookingDate: "2024-01-18",
-      visitDate: "2024-01-28",
-      amount: 2000,
-      status: "cancelled",
-      paymentId: "PAY_004",
-      category: "coaching"
-    }
-  ]);
-
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [categoryFilter, setCategoryFilter] = useState("all");
 
-  const filteredBookings = bookings.filter(booking => {
-    const matchesSearch = booking.studentName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         booking.institutionName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         booking.id.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === "all" || booking.status === statusFilter;
-    const matchesCategory = categoryFilter === "all" || booking.category === categoryFilter;
-    
-    return matchesSearch && matchesStatus && matchesCategory;
+  const { data: bookingsData, isLoading, error } = useQuery<Booking[]>({
+    queryKey: ['admin-bookings', statusFilter, categoryFilter, searchTerm],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (statusFilter !== 'all') params.append('status', statusFilter);
+      if (categoryFilter !== 'all') params.append('category', categoryFilter);
+      if (searchTerm) params.append('search', searchTerm);
+
+      const response = await api.get<ApiResponse>(`/dashboard/admin/bookings?${params.toString()}`);
+      return response.data.data;
+    }
   });
 
-  const handleStatusChange = (bookingId, newStatus) => {
-    setBookings(prev => prev.map(booking => 
-      booking.id === bookingId 
-        ? { ...booking, status: newStatus }
-        : booking
-    ));
-    toast.success(`Booking status updated to ${newStatus}`);
+  useEffect(() => {
+    if (error) {
+      toast.error('Failed to load bookings');
+    }
+  }, [error]);
+
+  const filteredBookings = bookingsData || [];
+
+  const handleStatusChange = async (bookingId: string, newStatus: string) => {
+    try {
+      await api.patch(`/dashboard/admin/bookings/${bookingId}/status`, { status: newStatus });
+      toast.success(`Booking status updated to ${newStatus}`);
+    } catch (error) {
+      toast.error('Failed to update booking status');
+    }
   };
 
-  const handleDownloadReceipt = (booking) => {
-    // Mock receipt download
-    const receiptData = {
-      bookingId: booking.id,
-      institutionName: booking.institutionName,
-      studentName: booking.studentName,
-      amount: booking.amount,
-      date: booking.bookingDate,
-      paymentId: booking.paymentId
-    };
-    
-    const dataStr = JSON.stringify(receiptData, null, 2);
-    const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
-    
-    const exportFileDefaultName = `receipt-${booking.id}.json`;
-    
-    const linkElement = document.createElement('a');
-    linkElement.setAttribute('href', dataUri);
-    linkElement.setAttribute('download', exportFileDefaultName);
-    linkElement.click();
-    
-    toast.success("Receipt downloaded successfully!");
+  const handleDownloadReceipt = async (booking: Booking) => {
+    try {
+      const response = await api.get(`/dashboard/admin/bookings/${booking.booking_id}/receipt`, {
+        responseType: 'blob'
+      });
+      
+      const url = window.URL.createObjectURL(new Blob([response.data as BlobPart]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `receipt-${booking.booking_id}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      
+      toast.success("Receipt downloaded successfully!");
+    } catch (error) {
+      toast.error('Failed to download receipt');
+    }
   };
 
-  const getStatusBadgeVariant = (status) => {
+  const getStatusBadgeVariant = (status: string) => {
     switch (status) {
       case "confirmed": return "default";
       case "pending": return "secondary";
@@ -128,9 +102,17 @@ const BookingsManagement = () => {
     }
   };
 
-  const totalRevenue = bookings
-    .filter(b => b.status === "confirmed")
-    .reduce((sum, booking) => sum + booking.amount, 0);
+  const totalRevenue = bookingsData
+    ?.filter(b => b.status === "confirmed")
+    .reduce((sum, booking) => sum + booking.amount, 0) || 0;
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -148,10 +130,10 @@ const BookingsManagement = () => {
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         {[
-          { label: "Total Bookings", value: bookings.length, color: "bg-blue-500" },
-          { label: "Confirmed", value: bookings.filter(b => b.status === "confirmed").length, color: "bg-green-500" },
-          { label: "Pending", value: bookings.filter(b => b.status === "pending").length, color: "bg-yellow-500" },
-          { label: "Cancelled", value: bookings.filter(b => b.status === "cancelled").length, color: "bg-red-500" }
+          { label: "Total Bookings", value: bookingsData?.length || 0, color: "bg-blue-500" },
+          { label: "Confirmed", value: bookingsData?.filter(b => b.status === "confirmed").length || 0, color: "bg-green-500" },
+          { label: "Pending", value: bookingsData?.filter(b => b.status === "pending").length || 0, color: "bg-yellow-500" },
+          { label: "Cancelled", value: bookingsData?.filter(b => b.status === "cancelled").length || 0, color: "bg-red-500" }
         ].map((stat, index) => (
           <motion.div
             key={stat.label}
@@ -160,7 +142,7 @@ const BookingsManagement = () => {
             transition={{ duration: 0.5, delay: index * 0.1 }}
           >
             <Card>
-              <CardContent className="p-4">
+              <CardContent className="pt-6">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-gray-600">{stat.label}</p>
@@ -223,7 +205,7 @@ const BookingsManagement = () => {
       <Card>
         <CardHeader>
           <CardTitle>Booking Records</CardTitle>
-          <CardDescription>Showing {filteredBookings.length} of {bookings.length} bookings</CardDescription>
+          <CardDescription>Showing {filteredBookings.length} of {bookingsData?.length || 0} bookings</CardDescription>
         </CardHeader>
         <CardContent>
           <Table>
@@ -240,32 +222,32 @@ const BookingsManagement = () => {
             </TableHeader>
             <TableBody>
               {filteredBookings.map((booking) => (
-                <TableRow key={booking.id}>
-                  <TableCell className="font-medium">{booking.id}</TableCell>
+                <TableRow key={booking.booking_id}>
+                  <TableCell className="font-medium">{booking.booking_id}</TableCell>
                   <TableCell>
                     <div>
-                      <p className="font-medium">{booking.studentName}</p>
-                      <p className="text-sm text-gray-600">{booking.email}</p>
-                      <p className="text-sm text-gray-600">{booking.phone}</p>
+                      <p className="font-medium">{booking.visitor_name}</p>
+                      <p className="text-sm text-gray-600">{booking.visitor_email}</p>
+                      <p className="text-sm text-gray-600">{booking.visitor_phone}</p>
                     </div>
                   </TableCell>
                   <TableCell>
                     <div>
-                      <p className="font-medium">{booking.institutionName}</p>
-                      <p className="text-sm text-gray-600 capitalize">{booking.category}</p>
+                      <p className="font-medium">{booking.institution_name}</p>
+                      <p className="text-sm text-gray-600 capitalize">{booking.category_name}</p>
                     </div>
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1">
                       <Calendar className="h-4 w-4" />
-                      {booking.visitDate}
+                      {booking.visit_date} at {booking.visit_time}
                     </div>
                   </TableCell>
                   <TableCell className="font-medium">₹{booking.amount.toLocaleString()}</TableCell>
                   <TableCell>
                     <Select 
                       value={booking.status} 
-                      onValueChange={(value) => handleStatusChange(booking.id, value)}
+                      onValueChange={(value) => handleStatusChange(booking.booking_id, value)}
                     >
                       <SelectTrigger className="w-32">
                         <Badge variant={getStatusBadgeVariant(booking.status)}>

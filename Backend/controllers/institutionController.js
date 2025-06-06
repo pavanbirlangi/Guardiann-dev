@@ -2,6 +2,8 @@ const { query } = require('../config/database');
 const { validationResult } = require('express-validator');
 const pool = require('../config/database');
 const { v4: uuidv4 } = require('uuid');
+const { AdminGetUserCommand } = require('@aws-sdk/client-cognito-identity-provider');
+const { cognitoClient, userPoolId } = require('../config/cognito');
 
 /**
  * @swagger
@@ -847,6 +849,253 @@ const getInstitutionDetails = async (req, res) => {
     }
 };
 
+/**
+ * @swagger
+ * /api/institutions/book:
+ *   post:
+ *     summary: Create a booking
+ *     tags: [Institutions]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - institution_id
+ *               - visit_date
+ *               - visit_time
+ *               - amount
+ *             properties:
+ *               institution_id:
+ *                 type: string
+ *                 format: uuid
+ *               visit_date:
+ *                 type: string
+ *                 format: date
+ *               visit_time:
+ *                 type: string
+ *                 format: time
+ *               amount:
+ *                 type: number
+ *               notes:
+ *                 type: string
+ *               contact:
+ *                 type: object
+ *                 properties:
+ *                   name:
+ *                     type: string
+ *                   phone:
+ *                     type: string
+ *                   email:
+ *                     type: string
+ *     responses:
+ *       200:
+ *         description: Booking created
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   $ref: '#/components/schemas/Booking'
+ *       401:
+ *         description: Unauthorized
+ */
+const createBooking = async (req, res) => {
+    try {
+        const { institution_id, visit_date, visit_time, amount, notes, contact } = req.body;
+
+        // Get user details from Cognito first to get the username
+        const command = new AdminGetUserCommand({
+            UserPoolId: userPoolId,
+            Username: req.user.username
+        });
+        const cognitoUser = await cognitoClient.send(command);
+        const username = cognitoUser.Username;
+
+        // Get user id from users table
+        const userResult = await pool.query(
+            'SELECT id FROM users WHERE cognito_id = $1',
+            [username]
+        );
+        if (userResult.rows.length === 0) {
+            return res.status(404).json({ success: false, message: 'User not found' });
+        }
+        const user_id = userResult.rows[0].id;
+
+        console.log('Creating booking with data:', {
+            user_id,
+            institution_id,
+            visit_date,
+            visit_time,
+            amount,
+            notes,
+            contact
+        });
+
+        // Validate required fields
+        if (!institution_id || !visit_date || !visit_time || !amount) {
+            return res.status(400).json({
+                success: false,
+                message: 'Missing required fields'
+            });
+        }
+
+        // Validate institution exists
+        const institutionCheck = await pool.query(
+            'SELECT id, booking_amount FROM institutions WHERE id = $1',
+            [institution_id]
+        );
+
+        if (institutionCheck.rows.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: 'Institution not found'
+            });
+        }
+
+        // Validate booking amount matches institution's booking amount
+        if (parseFloat(amount) !== parseFloat(institutionCheck.rows[0].booking_amount)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid booking amount'
+            });
+        }
+
+        // Generate a unique booking_id (e.g., BK-20240315-001)
+        const date = new Date();
+        const dateStr = date.toISOString().slice(0, 10).replace(/-/g, '');
+        const randomNum = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+        const booking_id = `BK-${dateStr}-${randomNum}`;
+
+        // Create booking with contact information
+        const result = await pool.query(
+            `INSERT INTO bookings (
+                booking_id,
+                user_id,
+                institution_id,
+                visit_date,
+                visit_time,
+                amount,
+                notes,
+                status,
+                visitor_name,
+                visitor_email,
+                visitor_phone
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+            RETURNING *`,
+            [
+                booking_id,
+                user_id,
+                institution_id,
+                visit_date,
+                visit_time,
+                amount,
+                notes || null,
+                'pending',
+                contact?.name || null,
+                contact?.email || null,
+                contact?.phone || null
+            ]
+        );
+
+        console.log('Booking created successfully:', result.rows[0]);
+
+        res.json({
+            success: true,
+            data: result.rows[0]
+        });
+    } catch (error) {
+        console.error('Error creating booking:', error);
+        
+        // Handle specific database errors
+        if (error.code === '23505') { // Unique violation
+            return res.status(400).json({
+                success: false,
+                message: 'A booking with this ID already exists'
+            });
+        }
+        
+        if (error.code === '23503') { // Foreign key violation
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid institution or user ID'
+            });
+        }
+
+        if (error.code === '22P02') { // Invalid input syntax
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid data format'
+            });
+        }
+
+        res.status(500).json({
+            success: false,
+            message: 'Failed to create booking',
+            error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        });
+    }
+};
+
+const getBookingDetails = async (req, res) => {
+    try {
+        const { booking_id } = req.params;
+
+        // Get booking details with institution and category information
+        const result = await pool.query(
+            `SELECT 
+                b.*,
+                i.name as institution_name,
+                i.thumbnail_url,
+                i.address as institution_address,
+                i.city as institution_city,
+                i.state as institution_state,
+                i.contact as institution_contact,
+                i.visiting_hours,
+                c.name as category_name,
+                c.slug as category_slug
+            FROM bookings b
+            LEFT JOIN institutions i ON b.institution_id = i.id
+            LEFT JOIN categories c ON i.category_id = c.id
+            WHERE b.booking_id = $1`,
+            [booking_id]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: 'Booking not found'
+            });
+        }
+
+        // Transform the data
+        const booking = {
+            ...result.rows[0],
+            institution_contact: result.rows[0].institution_contact || {},
+            visiting_hours: result.rows[0].visiting_hours || [],
+            thumbnail_url: result.rows[0].thumbnail_url || null
+        };
+
+        res.json({
+            success: true,
+            data: booking
+        });
+    } catch (error) {
+        console.error('Error fetching booking details:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to fetch booking details',
+            error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        });
+    }
+};
+
 // Export all functions
 module.exports = {
     getAllInstitutions,
@@ -855,5 +1104,7 @@ module.exports = {
     updateInstitution,
     deleteInstitution,
     getInstitutionsByCategory,
-    getInstitutionDetails
+    getInstitutionDetails,
+    createBooking,
+    getBookingDetails
 }; 

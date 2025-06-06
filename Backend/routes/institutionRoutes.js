@@ -7,7 +7,9 @@ const {
     updateInstitution,
     deleteInstitution,
     getInstitutionsByCategory,
-    getInstitutionDetails
+    getInstitutionDetails,
+    createBooking,
+    getBookingDetails
 } = require('../controllers/institutionController');
 const { verifyToken, checkRole } = require('../middlewares/checkAuth');
 
@@ -396,5 +398,9 @@ router.get('/:slug', getInstitutionBySlug);
 router.post('/', verifyToken, checkRole(['ADMIN']), createInstitution);
 router.put('/:id', verifyToken, checkRole(['ADMIN']), updateInstitution);
 router.delete('/:id', verifyToken, checkRole(['ADMIN']), deleteInstitution);
+
+// Protected routes
+router.post('/book', verifyToken, createBooking);
+router.get('/booking/:booking_id', verifyToken, getBookingDetails);
 
 module.exports = router; 

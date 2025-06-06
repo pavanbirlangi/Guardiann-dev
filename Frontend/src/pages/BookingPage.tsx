@@ -1,52 +1,54 @@
-
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Calendar } from "lucide-react";
+import { Calendar as CalendarIcon } from "lucide-react";
+import { toast } from "sonner";
+import axios from "axios";
+import { useQuery } from '@tanstack/react-query';
+import { api } from '@/lib/api';
+import { format } from 'date-fns';
+import { Card } from '@/components/ui/card';
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
 
-// Mock data for institutions (simplified)
-const mockInstitutionsData = {
-  schools: [
-    {
-      id: 1,
-      name: "Greenfield International School",
-      address: "123 Education Lane, Delhi",
-      thumbnail: "https://images.unsplash.com/photo-1613896640137-bb5b31496315?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80",
-    },
-  ],
-  colleges: [
-    {
-      id: 1,
-      name: "National Institute of Technology",
-      address: "101 College Road, Delhi",
-      thumbnail: "https://images.unsplash.com/photo-1607237138185-eedd9c632b0b?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80",
-    },
-  ],
-  coaching: [
-    {
-      id: 1,
-      name: "Brilliant Tutorials",
-      address: "303 Coaching Street, Delhi",
-      thumbnail: "https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80",
-    },
-  ],
-  "pg-colleges": [
-    {
-      id: 1,
-      name: "Indian Institute of Management",
-      address: "505 MBA Road, Bangalore",
-      thumbnail: "https://images.unsplash.com/photo-1541339907198-e08756dedf3f?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80",
-    },
-  ]
-};
+interface Institution {
+  id: string;
+  name: string;
+  address: string;
+  thumbnail_url: string;
+  booking_amount: string;
+  contact: {
+    phone: string;
+    email: string;
+  };
+  visiting_hours?: string[];
+}
+
+interface ApiResponse<T> {
+  success: boolean;
+  message?: string;
+  data: T;
+}
+
+interface BookingResponse {
+  booking_id: string;
+  status: string;
+  amount: number;
+  visit_date: string;
+  visit_time: string;
+  payment_id?: string;
+}
 
 const BookingPage = () => {
   const { category, id } = useParams<{category: string, id: string}>();
   const navigate = useNavigate();
+  const [loading, setLoading] = useState(true);
+  const [institution, setInstitution] = useState<Institution | null>(null);
   
   const [formData, setFormData] = useState({
     name: "",
@@ -59,62 +61,57 @@ const BookingPage = () => {
   });
   
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
-  
-  if (!category || !id || !mockInstitutionsData[category as keyof typeof mockInstitutionsData]) {
-    return (
-      <Layout>
-        <div className="container py-12 text-center">
-          <h1 className="text-2xl font-bold mb-4">Institution not found</h1>
-          <p>The institution you are trying to book doesn't exist.</p>
-          <Link to="/categories">
-            <Button className="mt-4">Back to Categories</Button>
-          </Link>
-        </div>
-      </Layout>
-    );
-  }
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<Date>();
+  const [selectedTime, setSelectedTime] = useState('');
+  const [visitorName, setVisitorName] = useState('');
+  const [visitorEmail, setVisitorEmail] = useState('');
+  const [visitorPhone, setVisitorPhone] = useState('');
+  const [notes, setNotes] = useState('');
 
-  const institutions = mockInstitutionsData[category as keyof typeof mockInstitutionsData];
-  const institution = institutions.find(inst => inst.id === Number(id));
+  const { data: institutionData, isLoading } = useQuery<Institution>({
+    queryKey: ['institution', id],
+    queryFn: async () => {
+      const response = await api.get<ApiResponse<Institution>>(`/api/institutions/details/${id}`);
+      return response.data.data;
+    },
+    enabled: !!id,
+  });
 
-  if (!institution) {
-    return (
-      <Layout>
-        <div className="container py-12 text-center">
-          <h1 className="text-2xl font-bold mb-4">Institution not found</h1>
-          <p>The institution you are trying to book doesn't exist.</p>
-          <Link to={`/categories/${category}`}>
-            <Button className="mt-4">Back to Listing</Button>
-          </Link>
-        </div>
-      </Layout>
-    );
-  }
+  useEffect(() => {
+    const fetchInstitutionDetails = async () => {
+      try {
+        setLoading(true);
+        const response = await axios.get<ApiResponse<Institution>>(
+          `${import.meta.env.VITE_API_URL}/institutions/details/${id}`
+        );
+        
+        if (response.data.success) {
+          setInstitution(response.data.data);
+        } else {
+          throw new Error(response.data.message || 'Failed to fetch institution details');
+        }
+      } catch (error: any) {
+        console.error('Error fetching institution:', error);
+        toast.error(error.response?.data?.message || 'Failed to fetch institution details');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (id) {
+      fetchInstitutionDetails();
+    }
+  }, [id]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
+    const { name, value, type } = e.target as HTMLInputElement;
     setFormData({
       ...formData,
-      [name]: value,
+      [name]: type === 'checkbox' ? (e.target as HTMLInputElement).checked : value,
     });
     
     // Clear error for this field when user starts typing
-    if (formErrors[name]) {
-      setFormErrors({
-        ...formErrors,
-        [name]: "",
-      });
-    }
-  };
-
-  const handleCheckboxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, checked } = e.target;
-    setFormData({
-      ...formData,
-      [name]: checked,
-    });
-    
-    // Clear error for this field
     if (formErrors[name]) {
       setFormErrors({
         ...formErrors,
@@ -132,219 +129,238 @@ const BookingPage = () => {
     
     if (!formData.phone.trim()) {
       errors.phone = "Phone number is required";
-    } else if (!/^\d{10}$/.test(formData.phone.trim())) {
+    } else if (!/^\d{10}$/.test(formData.phone)) {
       errors.phone = "Please enter a valid 10-digit phone number";
     }
     
     if (!formData.email.trim()) {
       errors.email = "Email is required";
-    } else if (!/\S+@\S+\.\S+/.test(formData.email.trim())) {
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
       errors.email = "Please enter a valid email address";
     }
     
     if (!formData.date) {
-      errors.date = "Date is required";
+      errors.date = "Visit date is required";
+    } else {
+      const selectedDate = new Date(formData.date);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      if (selectedDate < today) {
+        errors.date = "Visit date cannot be in the past";
+      }
     }
     
     if (!formData.time) {
-      errors.time = "Time is required";
+      errors.time = "Visit time is required";
     }
     
     if (!formData.termsAccepted) {
-      errors.termsAccepted = "You must agree to the terms and conditions";
+      errors.termsAccepted = "You must accept the terms and conditions";
     }
     
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (validateForm()) {
-      // In a real application, we would handle payment processing here
-      console.log("Form submitted:", formData);
-      // Navigate to confirmation page
-      navigate(`/booking-confirmation/${category}/${id}`);
-    } else {
-      console.log("Form has errors");
+    if (!validateForm()) {
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      const accessToken = localStorage.getItem('accessToken');
+      if (!accessToken) {
+        toast.error('Please log in to make a booking');
+        navigate('/login', { 
+          state: { 
+            from: `/book/${category}/${id}`,
+            message: 'Please log in to make a booking'
+          } 
+        });
+        return;
+      }
+
+      // Format the date and time
+      const formattedDate = new Date(formData.date).toISOString().split('T')[0];
+      const formattedTime = formData.time + ':00'; // Add seconds for PostgreSQL TIME format
+
+      const response = await axios.post<ApiResponse<BookingResponse>>(
+        `${import.meta.env.VITE_API_URL}/institutions/book`,
+        {
+          institution_id: id,
+          visit_date: formattedDate,
+          visit_time: formattedTime,
+          amount: parseFloat(institution?.booking_amount || '0'),
+          notes: formData.notes,
+          contact: {
+            name: formData.name,
+            phone: formData.phone,
+            email: formData.email
+          }
+        },
+        {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      if (response.data.success) {
+        toast.success('Booking created successfully!');
+        navigate(`/booking-confirmation/${response.data.data.booking_id}`);
+      } else {
+        throw new Error(response.data.message || 'Failed to create booking');
+      }
+    } catch (error: any) {
+      console.error('Booking error:', error);
+      
+      // Handle authentication errors
+      if (error.response?.status === 401) {
+        toast.error('Your session has expired. Please log in again.');
+        localStorage.removeItem('accessToken'); // Clear invalid token
+        navigate('/login', { 
+          state: { 
+            from: `/book/${category}/${id}`,
+            message: 'Your session has expired. Please log in again.'
+          } 
+        });
+        return;
+      }
+      
+      toast.error(error.response?.data?.message || 'Failed to create booking');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  if (!institutionData) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold mb-4">Institution not found</h1>
+          <Button onClick={() => navigate(-1)}>Go Back</Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <Layout>
-      <div className="bg-gray-50 py-12">
-        <div className="container">
-          <div className="max-w-3xl mx-auto">
-            <div className="mb-8">
-              <h1 className="text-3xl font-bold mb-2">Book a Visit</h1>
-              <p className="text-gray-600">
-                Complete the form below to schedule your visit to {institution.name}
-              </p>
-            </div>
+      <div className="min-h-screen bg-gray-50 py-12">
+        <div className="max-w-4xl mx-auto px-4">
+          <Card className="p-6">
+            <h1 className="text-2xl font-bold mb-6">Book a Visit to {institutionData.name}</h1>
             
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-              <div className="md:col-span-2">
-                <div className="bg-white p-6 rounded-lg shadow-sm">
-                  <form onSubmit={handleSubmit}>
-                    <div className="space-y-6">
-                      <div>
-                        <Label htmlFor="name">Full Name</Label>
-                        <Input
-                          id="name"
-                          name="name"
-                          value={formData.name}
-                          onChange={handleInputChange}
-                          placeholder="Enter your full name"
-                          className={formErrors.name ? "border-red-500" : ""}
-                        />
-                        {formErrors.name && (
-                          <p className="text-red-500 text-sm mt-1">{formErrors.name}</p>
+            <form onSubmit={handleSubmit} className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium mb-2">Visit Date</label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "w-full justify-start text-left font-normal",
+                          !selectedDate && "text-muted-foreground"
                         )}
-                      </div>
-                      
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <Label htmlFor="phone">Phone Number</Label>
-                          <Input
-                            id="phone"
-                            name="phone"
-                            value={formData.phone}
-                            onChange={handleInputChange}
-                            placeholder="10-digit mobile number"
-                            className={formErrors.phone ? "border-red-500" : ""}
-                          />
-                          {formErrors.phone && (
-                            <p className="text-red-500 text-sm mt-1">{formErrors.phone}</p>
-                          )}
-                        </div>
-                        
-                        <div>
-                          <Label htmlFor="email">Email Address</Label>
-                          <Input
-                            id="email"
-                            name="email"
-                            type="email"
-                            value={formData.email}
-                            onChange={handleInputChange}
-                            placeholder="your@email.com"
-                            className={formErrors.email ? "border-red-500" : ""}
-                          />
-                          {formErrors.email && (
-                            <p className="text-red-500 text-sm mt-1">{formErrors.email}</p>
-                          )}
-                        </div>
-                      </div>
-                      
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <Label htmlFor="date">Preferred Date</Label>
-                          <div className="relative">
-                            <Input
-                              id="date"
-                              name="date"
-                              type="date"
-                              value={formData.date}
-                              onChange={handleInputChange}
-                              className={formErrors.date ? "border-red-500" : ""}
-                              min={new Date().toISOString().split('T')[0]}
-                            />
-                          </div>
-                          {formErrors.date && (
-                            <p className="text-red-500 text-sm mt-1">{formErrors.date}</p>
-                          )}
-                        </div>
-                        
-                        <div>
-                          <Label htmlFor="time">Preferred Time</Label>
-                          <Input
-                            id="time"
-                            name="time"
-                            type="time"
-                            value={formData.time}
-                            onChange={handleInputChange}
-                            className={formErrors.time ? "border-red-500" : ""}
-                          />
-                          {formErrors.time && (
-                            <p className="text-red-500 text-sm mt-1">{formErrors.time}</p>
-                          )}
-                        </div>
-                      </div>
-                      
-                      <div>
-                        <Label htmlFor="notes">Additional Notes (Optional)</Label>
-                        <Textarea
-                          id="notes"
-                          name="notes"
-                          value={formData.notes}
-                          onChange={handleInputChange}
-                          placeholder="Any specific queries or requirements"
-                          rows={3}
-                        />
-                      </div>
-                      
-                      <div className="border-t pt-6">
-                        <div className="flex items-center">
-                          <input
-                            type="checkbox"
-                            id="termsAccepted"
-                            name="termsAccepted"
-                            checked={formData.termsAccepted}
-                            onChange={handleCheckboxChange}
-                            className="h-4 w-4 text-education-600 focus:ring-education-500 border-gray-300 rounded mr-2"
-                          />
-                          <Label htmlFor="termsAccepted" className="text-sm">
-                            I agree to the <a href="#" className="text-education-600 hover:underline">terms and conditions</a>
-                          </Label>
-                        </div>
-                        {formErrors.termsAccepted && (
-                          <p className="text-red-500 text-sm mt-1">{formErrors.termsAccepted}</p>
-                        )}
-                      </div>
-                      
-                      <Button type="submit" className="w-full">
-                        Proceed to Payment (₹2,000)
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {selectedDate ? format(selectedDate, "PPP") : "Pick a date"}
                       </Button>
-                    </div>
-                  </form>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0">
+                      <Calendar
+                        mode="single"
+                        selected={selectedDate}
+                        onSelect={setSelectedDate}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium mb-2">Visit Time</label>
+                  <select
+                    value={selectedTime}
+                    onChange={(e) => setSelectedTime(e.target.value)}
+                    className="w-full p-2 border rounded-md"
+                    required
+                  >
+                    <option value="">Select a time</option>
+                    {institutionData.visiting_hours?.map((hours: string, index: number) => (
+                      <option key={index} value={hours}>{hours}</option>
+                    ))}
+                  </select>
                 </div>
               </div>
-              
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium mb-2">Visitor Name</label>
+                  <Input
+                    type="text"
+                    value={visitorName}
+                    onChange={(e) => setVisitorName(e.target.value)}
+                    required
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium mb-2">Visitor Email</label>
+                  <Input
+                    type="email"
+                    value={visitorEmail}
+                    onChange={(e) => setVisitorEmail(e.target.value)}
+                    required
+                  />
+                </div>
+              </div>
+
               <div>
-                <div className="bg-white p-6 rounded-lg shadow-sm sticky top-20">
-                  <h2 className="text-xl font-semibold mb-4">Booking Summary</h2>
-                  
-                  <div className="mb-4">
-                    <img
-                      src={institution.thumbnail}
-                      alt={institution.name}
-                      className="w-full h-32 object-cover rounded-lg"
-                    />
-                  </div>
-                  
-                  <h3 className="font-medium">{institution.name}</h3>
-                  <p className="text-sm text-gray-600 mb-4">{institution.address}</p>
-                  
-                  <div className="border-t border-b py-4 my-4">
-                    <div className="flex justify-between mb-2">
-                      <span className="text-gray-600">Booking Fee</span>
-                      <span className="font-semibold">₹2,000</span>
-                    </div>
-                    <p className="text-xs text-gray-500">This amount is adjustable against admission fees</p>
-                  </div>
-                  
-                  <div className="text-sm text-gray-600 mb-4">
-                    <p className="mb-2">Your booking includes:</p>
-                    <ul className="list-disc pl-5 space-y-1">
-                      <li>Guided campus tour</li>
-                      <li>Meeting with faculty</li>
-                      <li>Admission consultation</li>
-                    </ul>
-                  </div>
-                </div>
+                <label className="block text-sm font-medium mb-2">Visitor Phone</label>
+                <Input
+                  type="tel"
+                  value={visitorPhone}
+                  onChange={(e) => setVisitorPhone(e.target.value)}
+                  required
+                />
               </div>
-            </div>
-          </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">Additional Notes</label>
+                <Textarea
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="Any special requirements or questions?"
+                />
+              </div>
+
+              <div className="flex justify-between items-center">
+                <div>
+                  <p className="text-sm text-gray-600">Booking Amount:</p>
+                  <p className="text-xl font-bold">₹{institutionData.booking_amount}</p>
+                </div>
+                <Button type="submit" disabled={isSubmitting}>
+                  {isSubmitting ? 'Processing...' : 'Confirm Booking'}
+                </Button>
+              </div>
+            </form>
+          </Card>
         </div>
       </div>
     </Layout>

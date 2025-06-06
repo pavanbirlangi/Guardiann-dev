@@ -5,7 +5,10 @@ const {
     getAllCategories,
     addCategory,
     updateCategory,
-    deleteCategory
+    deleteCategory,
+    getAllBookings,
+    updateBookingStatus,
+    downloadBookingReceipt
 } = require('../controllers/adminController');
 
 /**
@@ -223,6 +226,205 @@ router.delete('/categories/:id',
     verifyToken,
     checkRole(['ADMIN']),
     deleteCategory
+);
+
+/**
+ * @swagger
+ * components:
+ *   schemas:
+ *     Booking:
+ *       type: object
+ *       properties:
+ *         booking_id:
+ *           type: string
+ *           description: Unique booking identifier
+ *         visitor_name:
+ *           type: string
+ *           description: Name of the visitor
+ *         visitor_email:
+ *           type: string
+ *           format: email
+ *           description: Email of the visitor
+ *         visitor_phone:
+ *           type: string
+ *           description: Phone number of the visitor
+ *         booking_date:
+ *           type: string
+ *           format: date-time
+ *           description: Date when the booking was made
+ *         visit_date:
+ *           type: string
+ *           format: date
+ *           description: Date of the visit
+ *         visit_time:
+ *           type: string
+ *           format: time
+ *           description: Time of the visit
+ *         amount:
+ *           type: number
+ *           description: Booking amount
+ *         status:
+ *           type: string
+ *           enum: [pending, confirmed, cancelled]
+ *           description: Current status of the booking
+ *         payment_id:
+ *           type: string
+ *           description: Payment reference ID
+ *         institution_name:
+ *           type: string
+ *           description: Name of the institution
+ *         category_name:
+ *           type: string
+ *           description: Category of the institution
+ */
+
+/**
+ * @swagger
+ * /api/dashboard/admin/bookings:
+ *   get:
+ *     summary: Get all bookings with filtering options
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *           enum: [all, pending, confirmed, cancelled]
+ *         description: Filter by booking status
+ *       - in: query
+ *         name: category
+ *         schema:
+ *           type: string
+ *         description: Filter by institution category
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *         description: Search in visitor name, institution name, or booking ID
+ *     responses:
+ *       200:
+ *         description: List of bookings
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/Booking'
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden - Insufficient permissions
+ *       500:
+ *         description: Server error
+ */
+router.get('/bookings',
+    verifyToken,
+    checkRole(['ADMIN']),
+    getAllBookings
+);
+
+/**
+ * @swagger
+ * /api/dashboard/admin/bookings/{bookingId}/status:
+ *   patch:
+ *     summary: Update booking status
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: bookingId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Booking ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - status
+ *             properties:
+ *               status:
+ *                 type: string
+ *                 enum: [pending, confirmed, cancelled]
+ *                 description: New status for the booking
+ *     responses:
+ *       200:
+ *         description: Booking status updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                 data:
+ *                   $ref: '#/components/schemas/Booking'
+ *       400:
+ *         description: Invalid status
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden - Insufficient permissions
+ *       404:
+ *         description: Booking not found
+ *       500:
+ *         description: Server error
+ */
+router.patch('/bookings/:bookingId/status',
+    verifyToken,
+    checkRole(['ADMIN']),
+    updateBookingStatus
+);
+
+/**
+ * @swagger
+ * /api/dashboard/admin/bookings/{bookingId}/receipt:
+ *   get:
+ *     summary: Download booking receipt
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: bookingId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Booking ID
+ *     responses:
+ *       200:
+ *         description: PDF receipt file
+ *         content:
+ *           application/pdf:
+ *             schema:
+ *               type: string
+ *               format: binary
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden - Insufficient permissions
+ *       404:
+ *         description: Booking not found
+ *       500:
+ *         description: Server error
+ */
+router.get('/bookings/:bookingId/receipt',
+    verifyToken,
+    checkRole(['ADMIN']),
+    downloadBookingReceipt
 );
 
 module.exports = router; 

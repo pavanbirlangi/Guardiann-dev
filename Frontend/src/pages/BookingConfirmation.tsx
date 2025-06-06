@@ -1,196 +1,198 @@
+import { useEffect, useState } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Calendar, Clock, MapPin, Phone, Download, ArrowLeft } from 'lucide-react';
+import { format } from 'date-fns';
+import { toast } from 'sonner';
+import { useAuth } from '@/hooks/useAuth';
+import { api } from '@/lib/api';
 
-import React from "react";
-import { useParams, Link } from "react-router-dom";
-import Layout from "@/components/Layout";
-import { Button } from "@/components/ui/button";
-import { Check, Download, Calendar } from "lucide-react";
+interface BookingData {
+  booking_id: string;
+  institution_name: string;
+  thumbnail_url: string | null;
+  category_name: string;
+  visit_date: string;
+  visit_time: string;
+  amount: number;
+  status: string;
+  visitor_name: string;
+  institution_address: string;
+  institution_city: string;
+  institution_state: string;
+  institution_contact: {
+    phone?: string;
+  };
+  visiting_hours: string[];
+}
 
-// Mock data for institutions (simplified)
-const mockInstitutionsData = {
-  schools: [
-    {
-      id: 1,
-      name: "Greenfield International School",
-      address: "123 Education Lane, Delhi",
-      thumbnail: "https://images.unsplash.com/photo-1613896640137-bb5b31496315?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80",
-    },
-  ],
-  colleges: [
-    {
-      id: 1,
-      name: "National Institute of Technology",
-      address: "101 College Road, Delhi",
-      thumbnail: "https://images.unsplash.com/photo-1607237138185-eedd9c632b0b?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80",
-    },
-  ],
-  coaching: [
-    {
-      id: 1,
-      name: "Brilliant Tutorials",
-      address: "303 Coaching Street, Delhi",
-      thumbnail: "https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80",
-    },
-  ],
-  "pg-colleges": [
-    {
-      id: 1,
-      name: "Indian Institute of Management",
-      address: "505 MBA Road, Bangalore",
-      thumbnail: "https://images.unsplash.com/photo-1541339907198-e08756dedf3f?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80",
-    },
-  ]
-};
+interface ApiResponse {
+  success: boolean;
+  data: BookingData;
+}
 
 const BookingConfirmation = () => {
-  const { category, id } = useParams<{category: string, id: string}>();
-  
-  if (!category || !id || !mockInstitutionsData[category as keyof typeof mockInstitutionsData]) {
+  const { booking_id } = useParams();
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const [isLoading, setIsLoading] = useState(true);
+
+  const { data: bookingData, error } = useQuery<BookingData>({
+    queryKey: ['booking', booking_id],
+    queryFn: async () => {
+      const response = await api.get<ApiResponse>(`/api/institutions/booking/${booking_id}`);
+      return response.data.data;
+    },
+    enabled: !!booking_id && !!user,
+  });
+
+  useEffect(() => {
+    if (error) {
+      toast.error('Failed to load booking details');
+      navigate('/user/dashboard');
+    }
+  }, [error, navigate]);
+
+  if (!bookingData) {
     return (
-      <Layout>
-        <div className="container py-12 text-center">
-          <h1 className="text-2xl font-bold mb-4">Booking not found</h1>
-          <p>We couldn't find details for this booking.</p>
-          <Link to="/categories">
-            <Button className="mt-4">Back to Categories</Button>
-          </Link>
-        </div>
-      </Layout>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
     );
   }
 
-  const institutions = mockInstitutionsData[category as keyof typeof mockInstitutionsData];
-  const institution = institutions.find(inst => inst.id === Number(id));
+  const {
+    booking_id: id,
+    institution_name,
+    thumbnail_url,
+    category_name,
+    visit_date,
+    visit_time,
+    amount,
+    status,
+    visitor_name,
+    institution_address,
+    institution_city,
+    institution_state,
+    institution_contact,
+    visiting_hours
+  } = bookingData;
 
-  if (!institution) {
+  const getStatusBadge = (status: string) => {
+    const statusConfig = {
+      pending: { color: 'bg-yellow-100 text-yellow-800', label: 'Pending' },
+      confirmed: { color: 'bg-green-100 text-green-800', label: 'Confirmed' },
+      completed: { color: 'bg-blue-100 text-blue-800', label: 'Completed' },
+      cancelled: { color: 'bg-red-100 text-red-800', label: 'Cancelled' }
+    };
+
+    const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.pending;
+
     return (
-      <Layout>
-        <div className="container py-12 text-center">
-          <h1 className="text-2xl font-bold mb-4">Booking not found</h1>
-          <p>We couldn't find details for this booking.</p>
-          <Link to={`/categories/${category}`}>
-            <Button className="mt-4">Back to Listing</Button>
-          </Link>
-        </div>
-      </Layout>
+      <Badge className={`${config.color} font-medium`}>
+        {config.label}
+      </Badge>
     );
-  }
-
-  // Generate random booking details
-  const bookingId = "SSC" + Math.floor(10000 + Math.random() * 90000);
-  const bookingDate = new Date();
-  const visitDate = new Date();
-  visitDate.setDate(bookingDate.getDate() + 3); // Visit date 3 days from now
+  };
 
   return (
-    <Layout>
-      <div className="bg-gray-50 py-12">
-        <div className="container">
-          <div className="max-w-2xl mx-auto">
-            <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-              {/* Success header */}
-              <div className="bg-green-50 p-6 text-center">
-                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Check className="h-8 w-8 text-green-600" />
+    <div className="min-h-screen bg-gray-50 py-12">
+      <div className="max-w-4xl mx-auto px-4">
+        <Button
+          variant="ghost"
+          className="mb-6"
+          onClick={() => navigate('/user/dashboard')}
+        >
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Back to Dashboard
+        </Button>
+
+        <Card className="p-6 mb-6">
+          <div className="flex flex-col md:flex-row gap-6">
+            <div className="w-full md:w-48 h-48 relative">
+              <img
+                src={thumbnail_url || 'https://placehold.co/400x400?text=No+Image'}
+                alt={institution_name}
+                className="w-full h-full object-cover rounded-lg"
+              />
+            </div>
+            <div className="flex-1">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-4">
+                <div>
+                  <h1 className="text-2xl font-bold mb-2">{institution_name}</h1>
+                  <p className="text-gray-600">{category_name}</p>
                 </div>
-                <h1 className="text-2xl font-bold text-green-800 mb-2">Booking Confirmed!</h1>
-                <p className="text-green-700">
-                  Your visit to {institution.name} has been successfully scheduled.
-                </p>
+                {getStatusBadge(status)}
               </div>
-              
-              {/* Booking details */}
-              <div className="p-6">
-                <div className="flex items-start gap-4 mb-6">
-                  <img
-                    src={institution.thumbnail}
-                    alt={institution.name}
-                    className="w-20 h-20 object-cover rounded-lg"
-                  />
-                  <div>
-                    <h2 className="font-semibold text-xl">{institution.name}</h2>
-                    <p className="text-gray-600 text-sm">{institution.address}</p>
-                  </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="flex items-center gap-2">
+                  <Calendar className="h-5 w-5 text-gray-500" />
+                  <span>{format(new Date(visit_date), 'MMMM d, yyyy')}</span>
                 </div>
-                
-                <div className="border rounded-lg p-4 mb-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <h3 className="text-sm text-gray-500 mb-1">Booking ID</h3>
-                      <p className="font-semibold">{bookingId}</p>
-                    </div>
-                    <div>
-                      <h3 className="text-sm text-gray-500 mb-1">Booking Date</h3>
-                      <p>{bookingDate.toLocaleDateString()}</p>
-                    </div>
-                    <div>
-                      <h3 className="text-sm text-gray-500 mb-1">Visit Date</h3>
-                      <p>{visitDate.toLocaleDateString()}</p>
-                    </div>
-                    <div>
-                      <h3 className="text-sm text-gray-500 mb-1">Visit Time</h3>
-                      <p>10:00 AM</p>
-                    </div>
-                    <div>
-                      <h3 className="text-sm text-gray-500 mb-1">Amount Paid</h3>
-                      <p className="font-semibold">₹2,000</p>
-                    </div>
-                    <div>
-                      <h3 className="text-sm text-gray-500 mb-1">Payment Status</h3>
-                      <span className="inline-block bg-green-100 text-green-800 px-2 py-1 rounded text-xs">
-                        Successful
-                      </span>
-                    </div>
-                  </div>
+                <div className="flex items-center gap-2">
+                  <Clock className="h-5 w-5 text-gray-500" />
+                  <span>{visit_time}</span>
                 </div>
-                
-                <div className="bg-gray-50 p-4 rounded-lg mb-6">
-                  <h3 className="font-medium mb-2">What's Next?</h3>
-                  <ul className="text-sm space-y-2">
-                    <li className="flex items-start">
-                      <Check className="h-4 w-4 text-green-600 mr-2 mt-1 flex-shrink-0" />
-                      <span>You will receive a confirmation email with your booking details.</span>
-                    </li>
-                    <li className="flex items-start">
-                      <Check className="h-4 w-4 text-green-600 mr-2 mt-1 flex-shrink-0" />
-                      <span>Our representative will contact you 24 hours before your scheduled visit.</span>
-                    </li>
-                    <li className="flex items-start">
-                      <Check className="h-4 w-4 text-green-600 mr-2 mt-1 flex-shrink-0" />
-                      <span>Please carry your booking ID and a valid ID proof during your visit.</span>
-                    </li>
-                  </ul>
+                <div className="flex items-center gap-2">
+                  <MapPin className="h-5 w-5 text-gray-500" />
+                  <span>{`${institution_address}, ${institution_city}, ${institution_state}`}</span>
                 </div>
-                
-                <div className="flex flex-col sm:flex-row gap-4">
-                  <Button className="flex items-center gap-2">
-                    <Download className="h-4 w-4" />
-                    Download Receipt
-                  </Button>
-                  <Button className="flex items-center gap-2" variant="outline">
-                    <Calendar className="h-4 w-4" />
-                    Add to Calendar
-                  </Button>
-                </div>
-              </div>
-              
-              {/* Footer */}
-              <div className="border-t p-6">
-                <p className="text-center text-gray-600 text-sm mb-4">
-                  Thank you for choosing Guardiann Connect.
-                </p>
-                <div className="text-center">
-                  <Link to="/">
-                    <Button variant="link">
-                      Back to Home
-                    </Button>
-                  </Link>
+                <div className="flex items-center gap-2">
+                  <Phone className="h-5 w-5 text-gray-500" />
+                  <span>{institution_contact?.phone || 'N/A'}</span>
                 </div>
               </div>
             </div>
           </div>
+        </Card>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <Card className="p-6">
+            <h2 className="text-xl font-semibold mb-4">Booking Details</h2>
+            <div className="space-y-3">
+              <div className="flex justify-between">
+                <span className="text-gray-600">Booking ID</span>
+                <span className="font-medium">{id}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Visitor Name</span>
+                <span className="font-medium">{visitor_name}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Amount</span>
+                <span className="font-medium">₹{amount}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Status</span>
+                <span className="font-medium">{getStatusBadge(status)}</span>
+              </div>
+            </div>
+          </Card>
+
+          <Card className="p-6">
+            <h2 className="text-xl font-semibold mb-4">Visiting Hours</h2>
+            <div className="space-y-3">
+              {visiting_hours?.map((hours: string, index: number) => (
+                <div key={index} className="flex justify-between">
+                  <span className="text-gray-600">Day {index + 1}</span>
+                  <span className="font-medium">{hours}</span>
+                </div>
+              ))}
+            </div>
+          </Card>
+        </div>
+
+        <div className="mt-6 flex justify-center">
+          <Button className="flex items-center gap-2">
+            <Download className="h-4 w-4" />
+            Download Receipt
+          </Button>
         </div>
       </div>
-    </Layout>
+    </div>
   );
 };
 
