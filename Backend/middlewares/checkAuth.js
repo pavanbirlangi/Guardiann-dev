@@ -1,6 +1,7 @@
 const { CognitoJwtVerifier } = require('aws-jwt-verify');
 const { AdminGetUserCommand } = require('@aws-sdk/client-cognito-identity-provider');
 const { cognitoClient, userPoolId, clientId } = require('../config/cognito');
+const pool = require('../config/database');
 
 // Initialize JWT verifier
 const verifier = CognitoJwtVerifier.create({
@@ -25,6 +26,20 @@ const getUserRole = async (username) => {
     }
 };
 
+// Helper function to get user ID from database
+const getUserId = async (cognitoId) => {
+    try {
+        const result = await pool.query(
+            'SELECT id FROM users WHERE cognito_id = $1',
+            [cognitoId]
+        );
+        return result.rows[0]?.id;
+    } catch (error) {
+        console.error('Error getting user ID:', error);
+        return null;
+    }
+};
+
 // Verify JWT token middleware
 const verifyToken = async (req, res, next) => {
     try {
@@ -41,8 +56,16 @@ const verifyToken = async (req, res, next) => {
         // Get user role from Cognito
         const role = await getUserRole(payload.username);
         
+        // Get user ID from database
+        const userId = await getUserId(payload.sub);
+        
+        if (!userId) {
+            return res.status(401).json({ message: 'User not found in database' });
+        }
+        
         // Add user info to request
         req.user = {
+            id: userId,
             username: payload.username,
             role: role
         };

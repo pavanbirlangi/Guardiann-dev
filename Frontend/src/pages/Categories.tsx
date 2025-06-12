@@ -29,7 +29,7 @@ const Categories = () => {
   useEffect(() => {
     const fetchCategories = async () => {
       try {
-        const response = await axios.get<ApiResponse>('http://localhost:3000/api/categories');
+        const response = await axios.get<ApiResponse>('https://guardiann.in/api/categories');
         if (response.data.success) {
           setCategories(response.data.data);
         } else {

@@ -15,7 +15,7 @@ const app = express();
 
 // Middleware
 app.use(cors({
-  origin: ['http://localhost:8080', 'http://localhost:5173'], // Allow both Vite and your frontend URLs
+  origin: ['https://www.guardiann.in','https://guardiann.in','http://localhost:8080', 'http://localhost:5173'], // Allow both Vite and your frontend URLs
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']

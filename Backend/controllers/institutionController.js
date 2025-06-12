@@ -4,6 +4,15 @@ const pool = require('../config/database');
 const { v4: uuidv4 } = require('uuid');
 const { AdminGetUserCommand } = require('@aws-sdk/client-cognito-identity-provider');
 const { cognitoClient, userPoolId } = require('../config/cognito');
+const Razorpay = require('razorpay');
+const crypto = require('crypto');
+// const { createOrder, verifyPayment } = require('../services/razorpay');
+
+// Initialize Razorpay instance
+const razorpay = new Razorpay({
+  key_id: process.env.RAZORPAY_KEY_ID,
+  key_secret: process.env.RAZORPAY_KEY_SECRET
+});
 
 /**
  * @swagger
@@ -908,133 +917,91 @@ const getInstitutionDetails = async (req, res) => {
  */
 const createBooking = async (req, res) => {
     try {
-        const { institution_id, visit_date, visit_time, amount, notes, contact } = req.body;
-
-        // Get user details from Cognito first to get the username
-        const command = new AdminGetUserCommand({
-            UserPoolId: userPoolId,
-            Username: req.user.username
-        });
-        const cognitoUser = await cognitoClient.send(command);
-        const username = cognitoUser.Username;
-
-        // Get user id from users table
-        const userResult = await pool.query(
-            'SELECT id FROM users WHERE cognito_id = $1',
-            [username]
-        );
-        if (userResult.rows.length === 0) {
-            return res.status(404).json({ success: false, message: 'User not found' });
-        }
-        const user_id = userResult.rows[0].id;
-
-        console.log('Creating booking with data:', {
-            user_id,
+        const {
             institution_id,
             visit_date,
             visit_time,
             amount,
             notes,
-            contact
+            visitor_name,
+            visitor_email,
+            visitor_phone
+        } = req.body;
+
+        console.log('Received booking request:', {
+            institution_id,
+            visit_date,
+            visit_time,
+            amount,
+            notes,
+            visitor_name,
+            visitor_email,
+            visitor_phone
         });
 
-        // Validate required fields
-        if (!institution_id || !visit_date || !visit_time || !amount) {
-            return res.status(400).json({
-                success: false,
-                message: 'Missing required fields'
-            });
-        }
+        const userId = req.user.id;
+        console.log('User ID:', userId);
 
-        // Validate institution exists
-        const institutionCheck = await pool.query(
-            'SELECT id, booking_amount FROM institutions WHERE id = $1',
-            [institution_id]
-        );
-
-        if (institutionCheck.rows.length === 0) {
-            return res.status(404).json({
-                success: false,
-                message: 'Institution not found'
-            });
-        }
-
-        // Validate booking amount matches institution's booking amount
-        if (parseFloat(amount) !== parseFloat(institutionCheck.rows[0].booking_amount)) {
-            return res.status(400).json({
-                success: false,
-                message: 'Invalid booking amount'
-            });
-        }
-
-        // Generate a unique booking_id (e.g., BK-20240315-001)
-        const date = new Date();
-        const dateStr = date.toISOString().slice(0, 10).replace(/-/g, '');
-        const randomNum = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
-        const booking_id = `BK-${dateStr}-${randomNum}`;
-
-        // Create booking with contact information
+        // Create booking with pending status
         const result = await pool.query(
             `INSERT INTO bookings (
-                booking_id,
                 user_id,
                 institution_id,
+                status,
                 visit_date,
                 visit_time,
                 amount,
                 notes,
-                status,
                 visitor_name,
                 visitor_email,
                 visitor_phone
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
             RETURNING *`,
             [
-                booking_id,
-                user_id,
+                userId,
                 institution_id,
+                'pending',
                 visit_date,
                 visit_time,
                 amount,
-                notes || null,
-                'pending',
-                contact?.name || null,
-                contact?.email || null,
-                contact?.phone || null
+                notes,
+                visitor_name,
+                visitor_email,
+                visitor_phone
             ]
         );
 
-        console.log('Booking created successfully:', result.rows[0]);
+        console.log('Booking created:', result.rows[0]);
+
+        // Create Razorpay order
+        const options = {
+            amount: amount * 100, // Razorpay expects amount in paise
+            currency: 'INR',
+            receipt: result.rows[0].booking_id,
+            notes: {
+                booking_id: result.rows[0].booking_id
+            }
+        };
+
+        console.log('Creating Razorpay order with options:', options);
+
+        const order = await razorpay.orders.create(options);
+        console.log('Razorpay order created:', order);
 
         res.json({
             success: true,
-            data: result.rows[0]
+            data: {
+                booking: result.rows[0],
+                payment: {
+                    order_id: order.id,
+                    amount: order.amount,
+                    currency: order.currency
+                }
+            }
         });
     } catch (error) {
         console.error('Error creating booking:', error);
-        
-        // Handle specific database errors
-        if (error.code === '23505') { // Unique violation
-            return res.status(400).json({
-                success: false,
-                message: 'A booking with this ID already exists'
-            });
-        }
-        
-        if (error.code === '23503') { // Foreign key violation
-            return res.status(400).json({
-                success: false,
-                message: 'Invalid institution or user ID'
-            });
-        }
-
-        if (error.code === '22P02') { // Invalid input syntax
-            return res.status(400).json({
-                success: false,
-                message: 'Invalid data format'
-            });
-        }
-
+        console.error('Error stack:', error.stack);
         res.status(500).json({
             success: false,
             message: 'Failed to create booking',
@@ -1096,6 +1063,116 @@ const getBookingDetails = async (req, res) => {
     }
 };
 
+// Create Razorpay order
+const createPaymentOrder = async (req, res) => {
+  try {
+    const { amount, booking_id } = req.body;
+
+    if (!amount || !booking_id) {
+      return res.status(400).json({
+        success: false,
+        message: 'Amount and booking_id are required'
+      });
+    }
+
+    // Create Razorpay order
+    const options = {
+      amount: amount * 100, // Razorpay expects amount in paise
+      currency: 'INR',
+      receipt: booking_id,
+      notes: {
+        booking_id: booking_id
+      }
+    };
+
+    const order = await razorpay.orders.create(options);
+
+    res.json({
+      success: true,
+      data: {
+        order_id: order.id,
+        amount: order.amount,
+        currency: order.currency
+      }
+    });
+  } catch (error) {
+    console.error('Error creating payment order:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to create payment order'
+    });
+  }
+};
+
+// Verify Razorpay payment webhook
+const verifyPaymentWebhook = async (req, res) => {
+  try {
+    const {
+      razorpay_order_id,
+      razorpay_payment_id,
+      razorpay_signature,
+      booking_id
+    } = req.body;
+
+    console.log('Verifying payment:', {
+      razorpay_order_id,
+      razorpay_payment_id,
+      razorpay_signature,
+      booking_id
+    });
+
+    // Verify signature
+    const body = razorpay_order_id + "|" + razorpay_payment_id;
+    const expectedSignature = crypto
+      .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
+      .update(body.toString())
+      .digest("hex");
+
+    const isAuthentic = expectedSignature === razorpay_signature;
+
+    if (isAuthentic) {
+      // Update booking status and payment details
+      const result = await pool.query(
+        `UPDATE bookings 
+         SET status = 'confirmed', 
+             payment_id = $1,
+             updated_at = CURRENT_TIMESTAMP
+         WHERE booking_id = $2
+         RETURNING *`,
+        [razorpay_payment_id, booking_id]
+      );
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({
+          success: false,
+          message: 'Booking not found'
+        });
+      }
+
+      console.log('Payment verified and booking updated:', result.rows[0]);
+
+      res.json({
+        success: true,
+        message: 'Payment verified successfully',
+        data: result.rows[0]
+      });
+    } else {
+      console.error('Invalid payment signature');
+      res.status(400).json({
+        success: false,
+        message: 'Invalid payment signature'
+      });
+    }
+  } catch (error) {
+    console.error('Error verifying payment:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to verify payment',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+};
+
 // Export all functions
 module.exports = {
     getAllInstitutions,
@@ -1106,5 +1183,7 @@ module.exports = {
     getInstitutionsByCategory,
     getInstitutionDetails,
     createBooking,
-    getBookingDetails
+    getBookingDetails,
+    createPaymentOrder,
+    verifyPaymentWebhook
 }; 

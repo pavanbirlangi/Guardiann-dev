@@ -9,7 +9,9 @@ const {
     getInstitutionsByCategory,
     getInstitutionDetails,
     createBooking,
-    getBookingDetails
+    getBookingDetails,
+    createPaymentOrder,
+    verifyPaymentWebhook
 } = require('../controllers/institutionController');
 const { verifyToken, checkRole } = require('../middlewares/checkAuth');
 
@@ -402,5 +404,10 @@ router.delete('/:id', verifyToken, checkRole(['ADMIN']), deleteInstitution);
 // Protected routes
 router.post('/book', verifyToken, createBooking);
 router.get('/booking/:booking_id', verifyToken, getBookingDetails);
+router.post('/verify-payment', verifyToken, verifyPaymentWebhook);
+
+// Add these routes after the existing routes
+router.post('/payment/create-order', verifyToken, createPaymentOrder);
+router.post('/payment/verify', verifyToken, verifyPaymentWebhook);
 
 module.exports = router; 

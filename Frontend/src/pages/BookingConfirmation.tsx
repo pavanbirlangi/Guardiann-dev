@@ -1,14 +1,12 @@
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, Clock, MapPin, Phone, Download, ArrowLeft } from 'lucide-react';
+import { Calendar, Clock, MapPin, Phone, Download, ArrowLeft, Check, AlertCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
-import { useAuth } from '@/hooks/useAuth';
-import { api } from '@/lib/api';
+import Layout from '@/components/Layout';
 
 interface BookingData {
   booking_id: string;
@@ -26,173 +24,361 @@ interface BookingData {
   institution_contact: {
     phone?: string;
   };
-  visiting_hours: string[];
-}
-
-interface ApiResponse {
-  success: boolean;
-  data: BookingData;
+  visiting_hours: Array<{
+    day: string;
+    hours: string;
+  }>;
+  payment_id: string;
+  visitor_email: string;
+  visitor_phone: string;
 }
 
 const BookingConfirmation = () => {
   const { booking_id } = useParams();
+  const [booking, setBooking] = useState<BookingData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
-  const { user } = useAuth();
-  const [isLoading, setIsLoading] = useState(true);
-
-  const { data: bookingData, error } = useQuery<BookingData>({
-    queryKey: ['booking', booking_id],
-    queryFn: async () => {
-      const response = await api.get<ApiResponse>(`/api/institutions/booking/${booking_id}`);
-      return response.data.data;
-    },
-    enabled: !!booking_id && !!user,
-  });
 
   useEffect(() => {
-    if (error) {
-      toast.error('Failed to load booking details');
-      navigate('/user/dashboard');
-    }
-  }, [error, navigate]);
+    const fetchBooking = async () => {
+      try {
+        if (!booking_id) {
+          setError('Booking ID is required');
+          setLoading(false);
+          return;
+        }
 
-  if (!bookingData) {
+        const response = await fetch(`http://localhost:3000/api/institutions/booking/${booking_id}`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
+          }
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.message || 'Failed to fetch booking details');
+        }
+
+        setBooking(data.data);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to fetch booking details');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchBooking();
+  }, [booking_id]);
+
+  const getStatusUI = (status: string) => {
+    switch (status.toLowerCase()) {
+      case 'confirmed':
+        return {
+          headerBg: 'bg-green-50',
+          iconBg: 'bg-green-100',
+          iconColor: 'text-green-600',
+          titleColor: 'text-green-800',
+          messageColor: 'text-green-700',
+          title: 'Booking Confirmed!',
+          message: 'Your visit has been successfully scheduled.',
+          paymentStatus: {
+            bg: 'bg-green-100',
+            text: 'text-green-800',
+            label: 'Successful'
+          },
+          icon: <Check className="h-8 w-8" />
+        };
+      case 'pending':
+        return {
+          headerBg: 'bg-yellow-50',
+          iconBg: 'bg-yellow-100',
+          iconColor: 'text-yellow-600',
+          titleColor: 'text-yellow-800',
+          messageColor: 'text-yellow-700',
+          title: 'Booking Pending',
+          message: 'Your booking is pending payment confirmation.',
+          paymentStatus: {
+            bg: 'bg-yellow-100',
+            text: 'text-yellow-800',
+            label: 'Pending'
+          },
+          icon: <AlertCircle className="h-8 w-8" />
+        };
+      case 'cancelled':
+        return {
+          headerBg: 'bg-red-50',
+          iconBg: 'bg-red-100',
+          iconColor: 'text-red-600',
+          titleColor: 'text-red-800',
+          messageColor: 'text-red-700',
+          title: 'Booking Cancelled',
+          message: 'This booking has been cancelled.',
+          paymentStatus: {
+            bg: 'bg-red-100',
+            text: 'text-red-800',
+            label: 'Cancelled'
+          },
+          icon: <AlertCircle className="h-8 w-8" />
+        };
+      default:
+        return {
+          headerBg: 'bg-gray-50',
+          iconBg: 'bg-gray-100',
+          iconColor: 'text-gray-600',
+          titleColor: 'text-gray-800',
+          messageColor: 'text-gray-700',
+          title: 'Booking Status',
+          message: 'Your booking status is being processed.',
+          paymentStatus: {
+            bg: 'bg-gray-100',
+            text: 'text-gray-800',
+            label: status
+          },
+          icon: <AlertCircle className="h-8 w-8" />
+        };
+    }
+  };
+
+  const handlePayment = async () => {
+    try {
+      // Create payment order
+      const orderResponse = await fetch('http://localhost:3000/api/institutions/payment/create-order', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
+        },
+        body: JSON.stringify({
+          amount: booking.amount,
+          booking_id: booking.booking_id
+        })
+      });
+
+      const orderData = await orderResponse.json();
+
+      if (!orderResponse.ok || !orderData.success) {
+        throw new Error(orderData.message || 'Failed to create payment order');
+      }
+
+      // Initialize Razorpay
+      const options = {
+        key: import.meta.env.VITE_RAZORPAY_KEY_ID,
+        amount: orderData.data.amount,
+        currency: "INR",
+        name: "Guardiann",
+        description: `Booking for ${booking.institution_name}`,
+        order_id: orderData.data.order_id,
+        handler: async function (response: any) {
+          try {
+            // Verify payment
+            const verifyResponse = await fetch('http://localhost:3000/api/institutions/verify-payment', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
+              },
+              body: JSON.stringify({
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature,
+                booking_id: booking.booking_id
+              })
+            });
+
+            const verifyData = await verifyResponse.json();
+
+            if (!verifyResponse.ok || !verifyData.success) {
+              throw new Error(verifyData.message || 'Payment verification failed');
+            }
+
+            toast.success('Payment successful!');
+            // Refresh the page to show updated status
+            window.location.reload();
+          } catch (error) {
+            console.error('Payment verification failed:', error);
+            toast.error('Payment verification failed. Please contact support.');
+          }
+        },
+        prefill: {
+          name: booking.visitor_name,
+          email: booking.visitor_email,
+          contact: booking.visitor_phone
+        },
+        theme: {
+          color: "#2563eb"
+        }
+      };
+
+      const razorpay = new (window as any).Razorpay(options);
+      razorpay.open();
+    } catch (error) {
+      console.error('Payment initialization failed:', error);
+      toast.error('Failed to initialize payment. Please try again.');
+    }
+  };
+
+  if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-      </div>
+      <Layout>
+        <div className="container py-12 text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+        </div>
+      </Layout>
     );
   }
 
-  const {
-    booking_id: id,
-    institution_name,
-    thumbnail_url,
-    category_name,
-    visit_date,
-    visit_time,
-    amount,
-    status,
-    visitor_name,
-    institution_address,
-    institution_city,
-    institution_state,
-    institution_contact,
-    visiting_hours
-  } = bookingData;
-
-  const getStatusBadge = (status: string) => {
-    const statusConfig = {
-      pending: { color: 'bg-yellow-100 text-yellow-800', label: 'Pending' },
-      confirmed: { color: 'bg-green-100 text-green-800', label: 'Confirmed' },
-      completed: { color: 'bg-blue-100 text-blue-800', label: 'Completed' },
-      cancelled: { color: 'bg-red-100 text-red-800', label: 'Cancelled' }
-    };
-
-    const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.pending;
-
+  if (error || !booking) {
     return (
-      <Badge className={`${config.color} font-medium`}>
-        {config.label}
-      </Badge>
+      <Layout>
+        <div className="container py-12 text-center">
+          <h1 className="text-2xl font-bold mb-4">Booking not found</h1>
+          <p>We couldn't find details for this booking.</p>
+          <Button className="mt-4" onClick={() => navigate('/dashboard')}>
+            Back to Dashboard
+          </Button>
+        </div>
+      </Layout>
     );
-  };
+  }
+
+  const bookingDate = new Date();
+  const statusUI = getStatusUI(booking.status);
 
   return (
-    <div className="min-h-screen bg-gray-50 py-12">
-      <div className="max-w-4xl mx-auto px-4">
-        <Button
-          variant="ghost"
-          className="mb-6"
-          onClick={() => navigate('/user/dashboard')}
-        >
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to Dashboard
-        </Button>
-
-        <Card className="p-6 mb-6">
-          <div className="flex flex-col md:flex-row gap-6">
-            <div className="w-full md:w-48 h-48 relative">
-              <img
-                src={thumbnail_url || 'https://placehold.co/400x400?text=No+Image'}
-                alt={institution_name}
-                className="w-full h-full object-cover rounded-lg"
-              />
-            </div>
-            <div className="flex-1">
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-4">
-                <div>
-                  <h1 className="text-2xl font-bold mb-2">{institution_name}</h1>
-                  <p className="text-gray-600">{category_name}</p>
+    <Layout>
+      <div className="bg-gray-50 py-12">
+        <div className="container">
+          <div className="max-w-2xl mx-auto">
+            <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+              {/* Status header */}
+              <div className={`${statusUI.headerBg} p-6 text-center`}>
+                <div className={`w-16 h-16 ${statusUI.iconBg} rounded-full flex items-center justify-center mx-auto mb-4`}>
+                  <div className={statusUI.iconColor}>
+                    {statusUI.icon}
+                  </div>
                 </div>
-                {getStatusBadge(status)}
+                <h1 className={`text-2xl font-bold ${statusUI.titleColor} mb-2`}>{statusUI.title}</h1>
+                <p className={statusUI.messageColor}>
+                  {statusUI.message}
+                </p>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="flex items-center gap-2">
-                  <Calendar className="h-5 w-5 text-gray-500" />
-                  <span>{format(new Date(visit_date), 'MMMM d, yyyy')}</span>
+              
+              {/* Booking details */}
+              <div className="p-6">
+                <div className="flex items-start gap-4 mb-6">
+                  <img
+                    src={booking.thumbnail_url || 'https://placehold.co/400x400?text=No+Image'}
+                    alt={booking.institution_name}
+                    className="w-20 h-20 object-cover rounded-lg"
+                  />
+                  <div>
+                    <h2 className="font-semibold text-xl">{booking.institution_name}</h2>
+                    <p className="text-gray-600 text-sm">{booking.institution_address}</p>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Clock className="h-5 w-5 text-gray-500" />
-                  <span>{visit_time}</span>
+                
+                <div className="border rounded-lg p-4 mb-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <h3 className="text-sm text-gray-500 mb-1">Booking ID</h3>
+                      <p className="font-semibold">{booking.booking_id}</p>
+                    </div>
+                    <div>
+                      <h3 className="text-sm text-gray-500 mb-1">Booking Date</h3>
+                      <p>{bookingDate.toLocaleDateString()}</p>
+                    </div>
+                    <div>
+                      <h3 className="text-sm text-gray-500 mb-1">Visit Date</h3>
+                      <p>{new Date(booking.visit_date).toLocaleDateString()}</p>
+                    </div>
+                    <div>
+                      <h3 className="text-sm text-gray-500 mb-1">Visit Time</h3>
+                      <p>{booking.visit_time}</p>
+                    </div>
+                    <div>
+                      <h3 className="text-sm text-gray-500 mb-1">Amount</h3>
+                      <p className="font-semibold">₹{booking.amount}</p>
+                    </div>
+                    <div>
+                      <h3 className="text-sm text-gray-500 mb-1">Payment Status</h3>
+                      <span className={`inline-block ${statusUI.paymentStatus.bg} ${statusUI.paymentStatus.text} px-2 py-1 rounded text-xs`}>
+                        {statusUI.paymentStatus.label}
+                      </span>
+                    </div>
+                    {booking.status === 'confirmed' && (
+                      <>
+                        <div>
+                          <h3 className="text-sm text-gray-500 mb-1">Payment ID</h3>
+                          <p className="font-semibold">{booking.payment_id}</p>
+                        </div>
+                        <div>
+                          <h3 className="text-sm text-gray-500 mb-1">Visitor Name</h3>
+                          <p>{booking.visitor_name}</p>
+                        </div>
+                      </>
+                    )}
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <MapPin className="h-5 w-5 text-gray-500" />
-                  <span>{`${institution_address}, ${institution_city}, ${institution_state}`}</span>
+                
+                {booking.status === 'confirmed' && (
+                  <div className="bg-gray-50 p-4 rounded-lg mb-6">
+                    <h3 className="font-medium mb-2">What's Next?</h3>
+                    <ul className="text-sm space-y-2">
+                      <li className="flex items-start">
+                        <Check className="h-4 w-4 text-green-600 mr-2 mt-1 flex-shrink-0" />
+                        <span>You will receive a confirmation email with your booking details.</span>
+                      </li>
+                      <li className="flex items-start">
+                        <Check className="h-4 w-4 text-green-600 mr-2 mt-1 flex-shrink-0" />
+                        <span>Our representative will contact you 24 hours before your scheduled visit.</span>
+                      </li>
+                      <li className="flex items-start">
+                        <Check className="h-4 w-4 text-green-600 mr-2 mt-1 flex-shrink-0" />
+                        <span>Please carry your booking ID and a valid ID proof during your visit.</span>
+                      </li>
+                    </ul>
+                  </div>
+                )}
+                
+                <div className="flex flex-col sm:flex-row gap-4">
+                  {booking.status === 'confirmed' && (
+                    <>
+                      <Button className="flex items-center gap-2">
+                        <Download className="h-4 w-4" />
+                        Download Receipt
+                      </Button>
+                      <Button className="flex items-center gap-2" variant="outline">
+                        <Calendar className="h-4 w-4" />
+                        Add to Calendar
+                      </Button>
+                    </>
+                  )}
+                  {booking.status === 'pending' && (
+                    <Button className="flex items-center gap-2" onClick={handlePayment}>
+                      Proceed to Payment
+                    </Button>
+                  )}
                 </div>
-                <div className="flex items-center gap-2">
-                  <Phone className="h-5 w-5 text-gray-500" />
-                  <span>{institution_contact?.phone || 'N/A'}</span>
+              </div>
+              
+              {/* Footer */}
+              <div className="border-t p-6">
+                <p className="text-center text-gray-600 text-sm mb-4">
+                  Thank you for choosing SchoolSeeker Connect.
+                </p>
+                <div className="text-center">
+                  <Button variant="link" onClick={() => navigate('/')}>
+                    Back to Home
+                  </Button>
                 </div>
               </div>
             </div>
           </div>
-        </Card>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <Card className="p-6">
-            <h2 className="text-xl font-semibold mb-4">Booking Details</h2>
-            <div className="space-y-3">
-              <div className="flex justify-between">
-                <span className="text-gray-600">Booking ID</span>
-                <span className="font-medium">{id}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Visitor Name</span>
-                <span className="font-medium">{visitor_name}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Amount</span>
-                <span className="font-medium">₹{amount}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Status</span>
-                <span className="font-medium">{getStatusBadge(status)}</span>
-              </div>
-            </div>
-          </Card>
-
-          <Card className="p-6">
-            <h2 className="text-xl font-semibold mb-4">Visiting Hours</h2>
-            <div className="space-y-3">
-              {visiting_hours?.map((hours: string, index: number) => (
-                <div key={index} className="flex justify-between">
-                  <span className="text-gray-600">Day {index + 1}</span>
-                  <span className="font-medium">{hours}</span>
-                </div>
-              ))}
-            </div>
-          </Card>
-        </div>
-
-        <div className="mt-6 flex justify-center">
-          <Button className="flex items-center gap-2">
-            <Download className="h-4 w-4" />
-            Download Receipt
-          </Button>
         </div>
       </div>
-    </div>
+    </Layout>
   );
 };
 

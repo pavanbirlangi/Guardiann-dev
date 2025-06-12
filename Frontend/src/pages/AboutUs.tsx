@@ -35,7 +35,7 @@ const AboutUs = () => {
             
             <h2 className="text-2xl font-semibold text-education-600 mb-4">Our Story</h2>
             <p className="mb-6">
-            Guardiann was founded in 2023 by a group of education enthusiasts who recognized the challenges faced by students and parents when searching for the right educational institutions. The process was often overwhelming, time-consuming, and lacked transparency.
+            Guardiann was founded in 2025 by a group of education enthusiasts who recognized the challenges faced by students and parents when searching for the right educational institutions. The process was often overwhelming, time-consuming, and lacked transparency.
             </p>
             <p className="mb-6">
               We set out to create a platform that simplifies this journey, providing comprehensive information, easy comparisons, and a streamlined booking process to visit institutions of interest.

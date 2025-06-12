@@ -36,6 +36,21 @@ const Footer = () => {
                   Contact
                 </Link>
               </li>
+              <li>
+                <Link to="/terms" className="text-sm text-gray-600 hover:text-education-600">
+                  Terms & Conditions
+              </Link>
+              </li>
+              <li>
+                <Link to="/privacy" className="text-sm text-gray-600 hover:text-education-600">
+                  Privacy Policy
+                </Link>
+              </li>
+              <li>
+                <Link to="/refund" className="text-sm text-gray-600 hover:text-education-600">
+                 Refund Policy
+                </Link>
+              </li>
             </ul>
           </div>
 
@@ -72,7 +87,7 @@ const Footer = () => {
                 support@guardiann.com
               </li>
               <li className="text-sm text-gray-600">
-                +91 99999 88888
+                +91 9063601724
               </li>
             </ul>
           </div>

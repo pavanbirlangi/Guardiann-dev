@@ -158,8 +158,8 @@ const UserDashboard = () => {
     }
   };
   
-  const handleViewBooking = (bookingId: string, category: string, institutionId: string) => {
-    navigate(`/booking-confirmation/${category}/${institutionId}`);
+  const handleViewBooking = (bookingId: string) => {
+    navigate(`/booking-confirmation/${bookingId}`);
   };
   
   const getStatusBadge = (status: string) => {
@@ -293,7 +293,7 @@ const UserDashboard = () => {
                                       <Button
                                         size="sm"
                                         className="flex items-center gap-1"
-                                        onClick={() => handleViewBooking(booking.booking_id, booking.category_name, booking.institution_id)}
+                                        onClick={() => handleViewBooking(booking.booking_id)}
                                       >
                                         View Details
                                       </Button>

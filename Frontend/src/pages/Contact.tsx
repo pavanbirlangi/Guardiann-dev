@@ -71,7 +71,7 @@ const Contact = () => {
                   </div>
                   <div>
                     <h3 className="font-medium">Email</h3>
-                    <p className="text-gray-600">info@guardiann.com</p>
+                    <p className="text-gray-600">support  @guardiann.com</p>
                   </div>
                 </div>
                 
@@ -83,7 +83,7 @@ const Contact = () => {
                   </div>
                   <div>
                     <h3 className="font-medium">Phone</h3>
-                    <p className="text-gray-600">+1 (555) 123-4567</p>
+                    <p className="text-gray-600">+91 9063601724</p>
                   </div>
                 </div>
                 
@@ -97,9 +97,9 @@ const Contact = () => {
                   <div>
                     <h3 className="font-medium">Address</h3>
                     <p className="text-gray-600">
-                      123 Education Lane<br />
-                      Knowledge City, KN 10001<br />
-                      United States
+                      Himagiri Block<br />
+                      Vizianagaram, AP 535002<br />
+                      India.
                     </p>
                   </div>
                 </div>

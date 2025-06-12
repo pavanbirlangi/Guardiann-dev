@@ -18,6 +18,10 @@ import AdminDashboard from "./pages/AdminDashboard";
 import GoogleCallback from "./pages/GoogleCallback";
 import NotFound from "./pages/NotFound";
 import { useEffect } from "react";
+import TermsAndConditions from "./pages/TermsAndConditions";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
+import RefundPolicy from "./pages/RefundPolicy";
+
 
 const queryClient = new QueryClient();
 
@@ -78,6 +82,9 @@ const App = () => (
           <Route path="/contact" element={<Contact />} />
           <Route path="/auth" element={<Auth />} />
           <Route path="/auth/google/callback" element={<GoogleCallback />} />
+          <Route path="/terms" element={<TermsAndConditions />} />
+          <Route path="/privacy" element={<PrivacyPolicy />} />
+          <Route path="/refund" element={<RefundPolicy />} />
           
           {/* Protected Routes */}
           <Route 
