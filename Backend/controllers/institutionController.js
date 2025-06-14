@@ -6,12 +6,48 @@ const { AdminGetUserCommand } = require('@aws-sdk/client-cognito-identity-provid
 const { cognitoClient, userPoolId } = require('../config/cognito');
 const Razorpay = require('razorpay');
 const crypto = require('crypto');
+const PDFDocument = require('pdfkit');
+const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
+const { format } = require('date-fns');
+const fs = require('fs');
+const nodemailer = require('nodemailer');
 // const { createOrder, verifyPayment } = require('../services/razorpay');
 
 // Initialize Razorpay instance
 const razorpay = new Razorpay({
   key_id: process.env.RAZORPAY_KEY_ID,
   key_secret: process.env.RAZORPAY_KEY_SECRET
+});
+
+// Initialize S3 client
+const s3Client = new S3Client({
+  region: process.env.AWS_REGION,
+  credentials: {
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY
+  }
+});
+
+// Create Brevo SMTP transporter
+const transporter = nodemailer.createTransport({
+  host: 'smtp-relay.brevo.com',
+  port: 587,
+  secure: false,
+  auth: {
+    user: process.env.BREVO_SMTP_USER,
+    pass: process.env.BREVO_SMTP_PASSWORD
+  },
+  debug: true, // Enable debug logs
+  logger: true // Enable logger
+});
+
+// Verify SMTP connection
+transporter.verify(function(error, success) {
+  if (error) {
+    console.error('SMTP Connection Error:', error);
+  } else {
+    console.log('SMTP Server is ready to take our messages');
+  }
 });
 
 /**
@@ -1104,73 +1140,225 @@ const createPaymentOrder = async (req, res) => {
   }
 };
 
-// Verify Razorpay payment webhook
-const verifyPaymentWebhook = async (req, res) => {
-  try {
-    const {
-      razorpay_order_id,
-      razorpay_payment_id,
-      razorpay_signature,
-      booking_id
-    } = req.body;
+// Verify payment and update booking status
+const verifyPayment = async (req, res) => {
+    try {
+        const {
+            razorpay_order_id,
+            razorpay_payment_id,
+            razorpay_signature,
+            booking_id
+        } = req.body;
 
-    console.log('Verifying payment:', {
-      razorpay_order_id,
-      razorpay_payment_id,
-      razorpay_signature,
-      booking_id
-    });
+        // Verify signature
+        const body = razorpay_order_id + "|" + razorpay_payment_id;
+        const expectedSignature = crypto
+            .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
+            .update(body.toString())
+            .digest("hex");
 
-    // Verify signature
-    const body = razorpay_order_id + "|" + razorpay_payment_id;
-    const expectedSignature = crypto
-      .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
-      .update(body.toString())
-      .digest("hex");
+        const isAuthentic = expectedSignature === razorpay_signature;
 
-    const isAuthentic = expectedSignature === razorpay_signature;
+        if (!isAuthentic) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid payment signature'
+            });
+        }
 
-    if (isAuthentic) {
-      // Update booking status and payment details
-      const result = await pool.query(
-        `UPDATE bookings 
-         SET status = 'confirmed', 
-             payment_id = $1,
-             updated_at = CURRENT_TIMESTAMP
-         WHERE booking_id = $2
-         RETURNING *`,
-        [razorpay_payment_id, booking_id]
-      );
+        // Get booking details
+        const bookingResult = await pool.query(`
+            SELECT 
+                b.*,
+                i.name as institution_name,
+                i.address as institution_address,
+                i.city as institution_city,
+                i.state as institution_state
+            FROM bookings b
+            JOIN institutions i ON b.institution_id = i.id
+            WHERE b.booking_id = $1
+        `, [booking_id]);
 
-      if (result.rows.length === 0) {
-        return res.status(404).json({
-          success: false,
-          message: 'Booking not found'
+        if (bookingResult.rows.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: 'Booking not found'
+            });
+        }
+
+        const booking = bookingResult.rows[0];
+
+        // Generate PDF
+        const doc = new PDFDocument({ margin: 50 });
+        const chunks = [];
+
+        doc.on('data', chunk => chunks.push(chunk));
+        doc.on('end', async () => {
+            const pdfBuffer = Buffer.concat(chunks);
+
+            // Upload to S3
+            const s3Key = `bookings/${booking_id}/receipt.pdf`;
+            await s3Client.send(new PutObjectCommand({
+                Bucket: process.env.AWS_S3_BUCKET,
+                Key: s3Key,
+                Body: pdfBuffer,
+                ContentType: 'application/pdf'
+            }));
+
+            const pdfUrl = `https://${process.env.AWS_S3_BUCKET}.s3.${process.env.AWS_REGION}.amazonaws.com/${s3Key}`;
+
+            // Update booking status and payment details
+            const result = await pool.query(
+                `UPDATE bookings 
+                 SET status = 'confirmed', 
+                     payment_id = $1,
+                     pdf_url = $2,
+                     updated_at = CURRENT_TIMESTAMP
+                 WHERE booking_id = $3
+                 RETURNING *`,
+                [razorpay_payment_id, pdfUrl, booking_id]
+            );
+
+            // Send confirmation email with PDF attachment
+            const mailOptions = {
+                from: {
+                    name: 'Guardiann',
+                    address: process.env.EMAIL_FROM || 'support@guardiann.in'
+                },
+                to: booking.visitor_email,
+                subject: 'Booking Confirmation – Guardiann',
+                html: `
+                    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                        <h2 style="color: #0a5275;">Booking Confirmation</h2>
+                        <p>Dear ${booking.visitor_name},</p>
+                        <p>Thank you for booking a visit with Guardiann. Your booking has been confirmed.</p>
+                        <div style="background-color: #f5f5f5; padding: 15px; border-radius: 5px; margin: 20px 0;">
+                            <p><strong>Booking ID:</strong> ${booking.booking_id}</p>
+                            <p><strong>Institution:</strong> ${booking.institution_name}</p>
+                            <p><strong>Visit Date:</strong> ${new Date(booking.visit_date).toLocaleDateString()}</p>
+                            <p><strong>Visit Time:</strong> ${booking.visit_time}</p>
+                            <p><strong>Amount Paid:</strong> ₹${booking.amount}</p>
+                        </div>
+                        <p>Please find your booking receipt attached to this email.</p>
+                        <p>If you have any questions, please don't hesitate to contact us.</p>
+                        <p>Best regards,<br>The Guardiann Team</p>
+                    </div>
+                `,
+                attachments: [{
+                    filename: `receipt-${booking_id}.pdf`,
+                    content: pdfBuffer
+                }]
+            };
+
+            try {
+                const info = await transporter.sendMail(mailOptions);
+                console.log('Email sent successfully:', info);
+            } catch (emailError) {
+                console.error('Error sending confirmation email:', emailError);
+                // Log detailed error information
+                if (emailError.response) {
+                    console.error('SMTP Response:', emailError.response);
+                }
+                // Don't fail the request if email fails
+            }
+
+            console.log('Payment verified and booking updated:', result.rows[0]);
+
+            res.json({
+                success: true,
+                message: 'Payment verified successfully',
+                data: result.rows[0]
+            });
         });
-      }
 
-      console.log('Payment verified and booking updated:', result.rows[0]);
+        // Colors and styles
+        const headingColor = '#0a5275';
+        const lineSpacing = 10;
+        const sectionSpacing = 20;
+        
+        function addSectionTitle(title) {
+            doc
+                .fillColor(headingColor)
+                .fontSize(14)
+                .text(title, { underline: true })
+                .moveDown(0.5)
+                .fillColor('black');
+        }
+        
+        // Title
+        doc
+            .fontSize(22)
+            .fillColor('#333333')
+            .text('📄 Booking Confirmation', { align: 'center' })
+            .moveDown(1.5);
+        
+        // Institution Details
+        addSectionTitle('🏢 Institution Details');
+        doc
+            .fontSize(12)
+            .text(`Name: `, { continued: true }).font('Helvetica-Bold').text(booking.institution_name)
+            .font('Helvetica').text(`Address: `, { continued: true }).font('Helvetica-Bold').text(booking.institution_address)
+            .font('Helvetica').text(`City: `, { continued: true }).font('Helvetica-Bold').text(booking.institution_city)
+            .font('Helvetica').text(`State: `, { continued: true }).font('Helvetica-Bold').text(booking.institution_state)
+            .moveDown();
+        
+        // Booking Details
+        addSectionTitle('📆 Booking Details');
+        doc
+            .fontSize(12)
+            .font('Helvetica').text(`Booking ID: `, { continued: true }).font('Helvetica-Bold').text(booking.booking_id)
+            .font('Helvetica').text(`Visit Date: `, { continued: true }).font('Helvetica-Bold').text(new Date(booking.visit_date).toLocaleDateString())
+            .font('Helvetica').text(`Visit Time: `, { continued: true }).font('Helvetica-Bold').text(booking.visit_time)
+            .font('Helvetica').text(`Amount: `, { continued: true }).font('Helvetica-Bold').text(`₹${booking.amount}`)
+            .font('Helvetica').text(`Status: `, { continued: true }).font('Helvetica-Bold').text(`Confirmed`)
+            .font('Helvetica').text(`Payment ID: `, { continued: true }).font('Helvetica-Bold').text(razorpay_payment_id)
+            .moveDown();
+        
+        // Visitor Details
+        addSectionTitle('🧍 Visitor Details');
+        doc
+            .fontSize(12)
+            .font('Helvetica').text(`Name: `, { continued: true }).font('Helvetica-Bold').text(booking.visitor_name)
+            .font('Helvetica').text(`Email: `, { continued: true }).font('Helvetica-Bold').text(booking.visitor_email)
+            .font('Helvetica').text(`Phone: `, { continued: true }).font('Helvetica-Bold').text(booking.visitor_phone)
+            .moveDown();
+        
+        // Additional Information
+        addSectionTitle('ℹ️ Additional Information');
+        doc
+            .fontSize(10)
+            .font('Helvetica')
+            .list([
+                'You will receive a confirmation email with your booking details.',
+                'Our representative will contact you 24 hours before your scheduled visit.',
+                'Please carry your booking ID and a valid ID proof during your visit.'
+            ])
+            .moveDown();
+        
+        // Divider
+        doc
+            .moveTo(doc.page.margins.left, doc.y)
+            .lineTo(doc.page.width - doc.page.margins.right, doc.y)
+            .strokeColor('#cccccc')
+            .lineWidth(1)
+            .stroke()
+            .moveDown(1);
+        
+        // Footer
+        doc
+            .fontSize(10)
+            .fillColor('#555555')
+            .text('Thank you for choosing Guardiann', { align: 'center' })
+            .text('For support, contact: support@guardiann.com', { align: 'center' });
 
-      res.json({
-        success: true,
-        message: 'Payment verified successfully',
-        data: result.rows[0]
-      });
-    } else {
-      console.error('Invalid payment signature');
-      res.status(400).json({
-        success: false,
-        message: 'Invalid payment signature'
-      });
+        doc.end();
+    } catch (error) {
+        console.error('Error verifying payment:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to verify payment'
+        });
     }
-  } catch (error) {
-    console.error('Error verifying payment:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to verify payment',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
-    });
-  }
 };
 
 // Export all functions
@@ -1185,5 +1373,5 @@ module.exports = {
     createBooking,
     getBookingDetails,
     createPaymentOrder,
-    verifyPaymentWebhook
+    verifyPayment
 }; 

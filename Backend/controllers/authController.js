@@ -5,7 +5,8 @@ const {
   AdminCreateUserCommand,
   AdminSetUserPasswordCommand,
   AdminGetUserCommand,
-  AdminUpdateUserAttributesCommand
+  AdminUpdateUserAttributesCommand,
+  InitiateAuthCommand
 } = require('@aws-sdk/client-cognito-identity-provider');
 const { cognitoClient, userPoolId, clientId, clientSecret } = require('../config/cognito');
 const { CognitoJwtVerifier } = require('aws-jwt-verify');
@@ -165,8 +166,47 @@ const logout = async (req, res) => {
   }
 };
 
+// Refresh token
+const refreshToken = async (req, res) => {
+  try {
+    const { refreshToken } = req.body;
+
+    if (!refreshToken) {
+      return res.status(400).json({
+        success: false,
+        message: 'Refresh token is required'
+      });
+    }
+
+    const command = new InitiateAuthCommand({
+      AuthFlow: 'REFRESH_TOKEN_AUTH',
+      ClientId: clientId,
+      AuthParameters: {
+        REFRESH_TOKEN: refreshToken,
+        SECRET_HASH: calculateSecretHash(refreshToken)
+      }
+    });
+
+    const response = await cognitoClient.send(command);
+
+    res.json({
+      success: true,
+      accessToken: response.AuthenticationResult.AccessToken,
+      refreshToken: response.AuthenticationResult.RefreshToken
+    });
+  } catch (error) {
+    console.error('Token refresh error:', error);
+    res.status(401).json({
+      success: false,
+      message: 'Failed to refresh token',
+      error: error.message
+    });
+  }
+};
+
 module.exports = {
   login,
   logout,
-  completeNewPasswordChallenge
+  completeNewPasswordChallenge,
+  refreshToken
 }; 

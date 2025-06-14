@@ -31,6 +31,7 @@ interface Booking {
   status: string;
   payment_id: string;
   category_name: string;
+  pdf_url?: string;
 }
 
 interface ApiResponse {
@@ -75,19 +76,11 @@ const BookingsManagement = () => {
 
   const handleDownloadReceipt = async (booking: Booking) => {
     try {
-      const response = await api.get(`/dashboard/admin/bookings/${booking.booking_id}/receipt`, {
-        responseType: 'blob'
-      });
-      
-      const url = window.URL.createObjectURL(new Blob([response.data as BlobPart]));
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', `receipt-${booking.booking_id}.pdf`);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      
-      toast.success("Receipt downloaded successfully!");
+      if (booking.pdf_url) {
+        window.open(booking.pdf_url, '_blank');
+      } else {
+        toast.error('Receipt not available');
+      }
     } catch (error) {
       toast.error('Failed to download receipt');
     }

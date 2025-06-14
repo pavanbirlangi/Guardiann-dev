@@ -11,7 +11,7 @@ const {
     createBooking,
     getBookingDetails,
     createPaymentOrder,
-    verifyPaymentWebhook
+    verifyPayment
 } = require('../controllers/institutionController');
 const { verifyToken, checkRole } = require('../middlewares/checkAuth');
 
@@ -390,6 +390,45 @@ const { verifyToken, checkRole } = require('../middlewares/checkAuth');
  *         description: Unauthorized
  */
 
+/**
+ * @swagger
+ * /api/institutions/verify-payment:
+ *   post:
+ *     summary: Verify Razorpay payment
+ *     tags: [Institutions]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - razorpay_order_id
+ *               - razorpay_payment_id
+ *               - razorpay_signature
+ *               - booking_id
+ *             properties:
+ *               razorpay_order_id:
+ *                 type: string
+ *               razorpay_payment_id:
+ *                 type: string
+ *               razorpay_signature:
+ *                 type: string
+ *               booking_id:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Payment verified successfully
+ *       400:
+ *         description: Invalid payment signature
+ *       404:
+ *         description: Booking not found
+ *       500:
+ *         description: Server error
+ */
+
 // Public routes
 router.get('/', getAllInstitutions);
 router.get('/list/:category', getInstitutionsByCategory);
@@ -404,10 +443,7 @@ router.delete('/:id', verifyToken, checkRole(['ADMIN']), deleteInstitution);
 // Protected routes
 router.post('/book', verifyToken, createBooking);
 router.get('/booking/:booking_id', verifyToken, getBookingDetails);
-router.post('/verify-payment', verifyToken, verifyPaymentWebhook);
-
-// Add these routes after the existing routes
 router.post('/payment/create-order', verifyToken, createPaymentOrder);
-router.post('/payment/verify', verifyToken, verifyPaymentWebhook);
+router.post('/verify-payment', verifyToken, verifyPayment);
 
 module.exports = router; 

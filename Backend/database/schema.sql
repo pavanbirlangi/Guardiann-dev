@@ -92,6 +92,10 @@ CREATE TABLE bookings (
     amount DECIMAL(10, 2) NOT NULL,
     payment_id VARCHAR(255),
     notes TEXT,
+    visitor_name VARCHAR(255),
+    visitor_email VARCHAR(255),
+    visitor_phone VARCHAR(20),
+    pdf_url VARCHAR(255),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );

@@ -73,7 +73,7 @@ const CategoriesManagement = () => {
       const accessToken = localStorage.getItem('accessToken');
       console.log('Fetching categories with token:', accessToken ? 'Token exists' : 'No token found');
       
-      const response = await axios.get<ApiResponse>('/api/dashboard/admin/categories', {
+      const response = await axios.get<ApiResponse>(`${import.meta.env.VITE_API_URL}/dashboard/admin/categories`, {
         headers: {
           Authorization: `Bearer ${accessToken}`
         }
@@ -145,7 +145,7 @@ const CategoriesManagement = () => {
 
       if (editingCategory) {
         const response = await axios.put<ApiResponse>(
-          `/api/dashboard/admin/categories/${editingCategory.id}`,
+          `${import.meta.env.VITE_API_URL}/dashboard/admin/categories/${editingCategory.id}`,
           payload,
           {
             headers: {
@@ -162,7 +162,7 @@ const CategoriesManagement = () => {
         }
       } else {
         const response = await axios.post<ApiResponse>(
-          '/api/dashboard/admin/categories',
+          `${import.meta.env.VITE_API_URL}/dashboard/admin/categories`,
           payload,
           {
             headers: {
@@ -186,7 +186,7 @@ const CategoriesManagement = () => {
 
   const handleDelete = async (categoryId: string) => {
     try {
-      const response = await axios.delete<ApiResponse>(`/api/dashboard/admin/categories/${categoryId}`, {
+      const response = await axios.delete<ApiResponse>(`${import.meta.env.VITE_API_URL}/dashboard/admin/categories/${categoryId}`, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem('accessToken')}`
         }

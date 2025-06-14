@@ -1,11 +1,21 @@
 const { 
     AdminGetUserCommand,
     AdminCreateUserCommand,
-    AdminSetUserPasswordCommand
+    AdminSetUserPasswordCommand,
+    AdminInitiateAuthCommand,
+    AdminRespondToAuthChallengeCommand
 } = require('@aws-sdk/client-cognito-identity-provider');
-const { cognitoClient, userPoolId, clientId } = require('../config/cognito');
+const { cognitoClient, userPoolId, clientId, clientSecret } = require('../config/cognito');
 const crypto = require('crypto');
 const { syncUserToRDS } = require('../utils/syncUser');
+
+// Helper function to calculate SECRET_HASH
+const calculateSecretHash = (username) => {
+    const message = username + clientId;
+    const hmac = crypto.createHmac('sha256', clientSecret);
+    hmac.update(message);
+    return hmac.digest('base64');
+};
 
 // Helper function to generate a secure password
 const generateSecurePassword = () => {
@@ -75,6 +85,7 @@ const handleGoogleCallback = async (req, res) => {
         const { email, name, picture } = userInfo;
 
         let cognitoId;
+        let isNewUser = false;
 
         // Check if user exists in Cognito
         try {
@@ -87,6 +98,7 @@ const handleGoogleCallback = async (req, res) => {
         } catch (error) {
             // If user doesn't exist, create new user
             if (error.name === 'UserNotFoundException') {
+                isNewUser = true;
                 // Generate a secure password that meets Cognito requirements
                 const securePassword = generateSecurePassword();
                 
@@ -131,6 +143,49 @@ const handleGoogleCallback = async (req, res) => {
                 });
 
                 await cognitoClient.send(setPasswordCommand);
+
+                // Authenticate the new user
+                const authCommand = new AdminInitiateAuthCommand({
+                    UserPoolId: userPoolId,
+                    ClientId: clientId,
+                    AuthFlow: 'ADMIN_USER_PASSWORD_AUTH',
+                    AuthParameters: {
+                        USERNAME: email,
+                        PASSWORD: securePassword,
+                        SECRET_HASH: calculateSecretHash(email)
+                    }
+                });
+
+                const authResponse = await cognitoClient.send(authCommand);
+
+                // Prepare the auth data
+                const authData = {
+                    message: 'Google authentication successful',
+                    user: {
+                        email,
+                        name,
+                        picture,
+                        role: 'USER'
+                    },
+                    tokens: {
+                        accessToken: authResponse.AuthenticationResult.AccessToken,
+                        idToken: authResponse.AuthenticationResult.IdToken,
+                        refreshToken: authResponse.AuthenticationResult.RefreshToken
+                    }
+                };
+
+                // Sync user to RDS
+                try {
+                    console.log('Syncing new Google user to RDS:', { email, cognitoId });
+                    await syncUserToRDS(cognitoId, email);
+                } catch (syncError) {
+                    console.error('Error syncing new Google user to RDS:', syncError);
+                }
+
+                // Redirect to frontend with auth data
+                const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:8080';
+                const redirectUrl = `${frontendUrl}/auth/google/callback?data=${encodeURIComponent(JSON.stringify(authData))}`;
+                return res.redirect(redirectUrl);
             } else {
                 throw error;
             }
@@ -140,20 +195,46 @@ const handleGoogleCallback = async (req, res) => {
             throw new Error('Failed to get or create Cognito user ID');
         }
 
-        // Sync user to RDS
-        try {
-            console.log('Syncing Google user to RDS:', { email, cognitoId });
-            await syncUserToRDS(cognitoId, email);
-        } catch (syncError) {
-            console.error('Error syncing Google user to RDS:', syncError);
-            // Continue with the response even if sync fails
-            // The user can still be synced later
-        }
+        // For existing users, we need to authenticate with Cognito
+        // First, get the user's current password or generate a new one
+        const securePassword = generateSecurePassword();
+        
+        // Update the user's password in Cognito
+        const setPasswordCommand = new AdminSetUserPasswordCommand({
+            UserPoolId: userPoolId,
+            Username: email,
+            Password: securePassword,
+            Permanent: true
+        });
+
+        await cognitoClient.send(setPasswordCommand);
+
+        // Authenticate with Cognito
+        const authCommand = new AdminInitiateAuthCommand({
+            UserPoolId: userPoolId,
+            ClientId: clientId,
+            AuthFlow: 'ADMIN_USER_PASSWORD_AUTH',
+            AuthParameters: {
+                USERNAME: email,
+                PASSWORD: securePassword,
+                SECRET_HASH: calculateSecretHash(email)
+            }
+        });
+
+        const authResponse = await cognitoClient.send(authCommand);
 
         // Get user role
         const role = await getUserRole(email);
 
-        // Prepare the auth data
+        // Sync user to RDS
+        try {
+            console.log('Syncing existing Google user to RDS:', { email, cognitoId });
+            await syncUserToRDS(cognitoId, email);
+        } catch (syncError) {
+            console.error('Error syncing existing Google user to RDS:', syncError);
+        }
+
+        // Prepare the auth data using Cognito tokens
         const authData = {
             message: 'Google authentication successful',
             user: {
@@ -163,9 +244,9 @@ const handleGoogleCallback = async (req, res) => {
                 role
             },
             tokens: {
-                accessToken: tokens.access_token,
-                idToken: tokens.id_token,
-                refreshToken: tokens.refresh_token
+                accessToken: authResponse.AuthenticationResult.AccessToken,
+                idToken: authResponse.AuthenticationResult.IdToken,
+                refreshToken: authResponse.AuthenticationResult.RefreshToken
             }
         };
 

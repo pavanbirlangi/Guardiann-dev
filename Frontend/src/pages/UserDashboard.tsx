@@ -8,10 +8,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Form, FormField, FormItem, FormLabel, FormControl, FormDescription, FormMessage } from "@/components/ui/form";
 import { Badge } from "@/components/ui/badge";
-import { useToast } from "@/components/ui/use-toast";
 import { Calendar, Check, Download, User } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import axios from "axios";
+import { toast } from "sonner";
 
 interface Booking {
   id: string;
@@ -28,6 +28,7 @@ interface Booking {
   visitor_name: string;
   visitor_email: string;
   visitor_phone: string;
+  pdf_url?: string;
 }
 
 interface UserProfile {
@@ -54,14 +55,14 @@ const DEFAULT_THUMBNAIL = 'https://placehold.co/96x96?text=No+Image';
 
 const UserDashboard = () => {
   const navigate = useNavigate();
-  const { toast } = useToast();
   const { user, logout } = useAuth();
-  const [activeTab, setActiveTab] = useState<string>("bookings");
+  const [activeTab, setActiveTab] = useState("bookings");
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isUpdating, setIsUpdating] = useState(false);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [bookingsLoading, setBookingsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   
   useEffect(() => {
     fetchUserProfile();
@@ -81,11 +82,7 @@ const UserDashboard = () => {
       }
     } catch (error) {
       console.error('Error fetching user profile:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to fetch user profile',
-        variant: 'destructive',
-      });
+      toast.error('Failed to fetch user profile');
     } finally {
       setIsLoading(false);
     }
@@ -104,22 +101,16 @@ const UserDashboard = () => {
       }
     } catch (error) {
       console.error('Error fetching bookings:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to fetch bookings',
-        variant: 'destructive',
-      });
+      setError('Failed to load bookings');
+      toast.error('Failed to load bookings');
     } finally {
       setBookingsLoading(false);
     }
   };
   
-  const handleLogout = async () => {
-    try {
-      await logout();
-    } catch (error) {
-      console.error('Logout error:', error);
-    }
+  const handleLogout = () => {
+    logout();
+    navigate('/');
   };
   
   const handleProfileUpdate = async (e: React.FormEvent) => {
@@ -141,18 +132,11 @@ const UserDashboard = () => {
         { headers: { Authorization: `Bearer ${token}` } }
       );
       if (response.data.success) {
-        toast({
-          title: 'Profile Updated',
-          description: 'Your profile has been updated successfully',
-        });
+        toast.success('Profile updated successfully');
       }
     } catch (error) {
       console.error('Error updating profile:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to update profile',
-        variant: 'destructive',
-      });
+      toast.error('Failed to update profile');
     } finally {
       setIsUpdating(false);
     }
@@ -301,6 +285,13 @@ const UserDashboard = () => {
                                         size="sm"
                                         variant="outline"
                                         className="flex items-center gap-1"
+                                        onClick={() => {
+                                          if (booking.pdf_url) {
+                                            window.open(booking.pdf_url, '_blank');
+                                          } else {
+                                            toast.error('Receipt not available');
+                                          }
+                                        }}
                                       >
                                         <Download className="h-4 w-4" /> Receipt
                                       </Button>

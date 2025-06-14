@@ -33,6 +33,12 @@ GOOGLE_CLIENT_SECRET=your_google_client_secret
 RAZORPAY_KEY_ID=your_razorpay_key_id
 RAZORPAY_KEY_SECRET=your_razorpay_key_secret
 
+# AWS Configuration
+AWS_REGION=your_aws_region
+AWS_ACCESS_KEY_ID=your_aws_access_key_id
+AWS_SECRET_ACCESS_KEY=your_aws_secret_access_key
+AWS_S3_BUCKET=your_s3_bucket_name
+
 # Server Configuration
 PORT=5000
 NODE_ENV=development

@@ -1,6 +1,6 @@
 const express = require('express');
 const { body } = require('express-validator');
-const { login, logout, completeNewPasswordChallenge } = require('../controllers/authController');
+const { login, logout, completeNewPasswordChallenge, refreshToken } = require('../controllers/authController');
 const { register, verifyEmail, forgotPassword, confirmForgotPassword } = require('../controllers/registerController');
 const { verifyToken } = require('../middlewares/checkAuth');
 const { handleGoogleCallback } = require('../controllers/oauthController');
@@ -321,6 +321,48 @@ router.post('/complete-new-password',
         body('session').notEmpty()
     ],
     completeNewPasswordChallenge
+);
+
+/**
+ * @swagger
+ * /api/auth/refresh-token:
+ *   post:
+ *     summary: Refresh access token
+ *     tags: [Authentication]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - refreshToken
+ *             properties:
+ *               refreshToken:
+ *                 type: string
+ *                 description: The refresh token to use for getting a new access token
+ *     responses:
+ *       200:
+ *         description: Token refreshed successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 accessToken:
+ *                   type: string
+ *                 refreshToken:
+ *                   type: string
+ *       401:
+ *         description: Invalid refresh token
+ */
+router.post('/refresh-token',
+  [
+    body('refreshToken').notEmpty()
+  ],
+  refreshToken
 );
 
 // Google OAuth routes

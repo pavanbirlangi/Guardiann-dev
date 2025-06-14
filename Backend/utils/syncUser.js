@@ -40,19 +40,20 @@ const syncUserToRDS = async (cognitoId, email) => {
         let result;
         if (existingUser.rows.length > 0) {
             console.log('Updating existing user in RDS');
-            // Update existing user
+            // Update existing user - try both cognito_id and email
             result = await query(
                 `UPDATE users 
                 SET 
-                    email = $1,
-                    full_name = $2,
-                    phone = $3,
-                    profile_picture_url = $4,
-                    google_id = $5,
+                    cognito_id = $1,
+                    email = $2,
+                    full_name = $3,
+                    phone = $4,
+                    profile_picture_url = $5,
+                    google_id = $6,
                     updated_at = CURRENT_TIMESTAMP
-                WHERE cognito_id = $6
+                WHERE cognito_id = $1 OR email = $2
                 RETURNING *`,
-                [email, fullName, phone, picture, googleId, cognitoId]
+                [cognitoId, email, fullName, phone, picture, googleId]
             );
         } else {
             console.log('Creating new user in RDS');

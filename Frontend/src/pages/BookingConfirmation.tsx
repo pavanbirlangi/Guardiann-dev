@@ -31,6 +31,7 @@ interface BookingData {
   payment_id: string;
   visitor_email: string;
   visitor_phone: string;
+  pdf_url?: string;
 }
 
 const BookingConfirmation = () => {
@@ -345,7 +346,16 @@ const BookingConfirmation = () => {
                 <div className="flex flex-col sm:flex-row gap-4">
                   {booking.status === 'confirmed' && (
                     <>
-                      <Button className="flex items-center gap-2">
+                      <Button 
+                        className="flex items-center gap-2"
+                        onClick={() => {
+                          if (booking.pdf_url) {
+                            window.open(booking.pdf_url, '_blank');
+                          } else {
+                            toast.error('Receipt not available');
+                          }
+                        }}
+                      >
                         <Download className="h-4 w-4" />
                         Download Receipt
                       </Button>
