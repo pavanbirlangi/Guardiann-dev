@@ -1,10 +1,10 @@
-
 import React from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Search } from "lucide-react";
 import { motion } from "framer-motion";
+import { useAuth } from "@/hooks/useAuth";
 
 const categoryCards = [
   {
@@ -72,6 +72,9 @@ const fadeIn = {
 };
 
 const HomePage = () => {
+  const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
+
   return (
     <Layout>
       {/* Hero Section */}
@@ -105,32 +108,23 @@ const HomePage = () => {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.6, duration: 0.5 }}
             >
-              <Button size="lg" className="bg-white text-education-700 hover:bg-gray-100">
+              <Button 
+                size="lg" 
+                className="bg-white text-education-700 hover:bg-gray-100"
+                onClick={() => isAuthenticated ? navigate('/categories') : navigate('/auth?tab=register')}
+              >
                 Get Started
               </Button>
-              <Button size="lg" variant="outline" className="border-white text-white hover:bg-white/10">
+              <Button 
+                size="lg" 
+                variant="outline" 
+                className="border-white text-white bg-transparent hover:bg-white hover:border-white hover:text-cyan-600 transition-all duration-300 hover:scale-105"
+                onClick={() => {
+                  document.getElementById('how-it-works')?.scrollIntoView({ behavior: 'smooth' });
+                }}
+              >
                 Learn More
               </Button>
-            </motion.div>
-
-            {/* Search bar */}
-            <motion.div 
-              className="max-w-xl mx-auto mt-8 relative"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.8, duration: 0.5 }}
-            >
-              <div className="flex items-center bg-white rounded-lg p-1.5 shadow-lg">
-                <input
-                  type="text"
-                  placeholder="Search by city, institution or course..."
-                  className="flex-grow p-2 focus:outline-none text-gray-800"
-                />
-                <Button className="bg-education-600 hover:bg-education-700">
-                  <Search className="h-5 w-5 mr-2" />
-                  Search
-                </Button>
-              </div>
             </motion.div>
           </div>
         </div>
@@ -199,7 +193,7 @@ const HomePage = () => {
       </section>
 
       {/* How it works */}
-      <section className="py-16">
+      <section id="how-it-works" className="py-16">
         <div className="container">
           <motion.div 
             className="text-center mb-12"
@@ -299,7 +293,11 @@ const HomePage = () => {
             <p className="text-lg mb-8">
               Join thousands of students who have found their ideal learning environment through Guardiann Connect
             </p>
-            <Button size="lg" className="bg-white text-education-700 hover:bg-gray-100">
+            <Button 
+              size="lg" 
+              className="bg-white text-education-700 hover:bg-gray-100"
+              onClick={() => isAuthenticated ? navigate('/categories') : navigate('/auth?tab=register')}
+            >
               Get Started Today
             </Button>
           </div>

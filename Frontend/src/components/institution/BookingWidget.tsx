@@ -1,7 +1,9 @@
 import React from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Check } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
+import { toast } from "sonner";
 
 interface BookingWidgetProps {
   institution: any;
@@ -10,10 +12,24 @@ interface BookingWidgetProps {
 }
 
 const BookingWidget: React.FC<BookingWidgetProps> = ({ institution, category, id }) => {
+  const { isAuthenticated } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+
   const formatAmount = (amount: string | number) => {
     if (!amount) return '0';
     const numAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
     return isNaN(numAmount) ? '0' : numAmount.toLocaleString();
+  };
+
+  const handleBookClick = (e: React.MouseEvent) => {
+    if (!isAuthenticated) {
+      e.preventDefault();
+      toast.error("Please login to book your visit");
+      // Store the current URL in localStorage before redirecting
+      localStorage.setItem('redirectAfterLogin', location.pathname);
+      navigate("/auth");
+    }
   };
 
   return (
@@ -50,7 +66,7 @@ const BookingWidget: React.FC<BookingWidgetProps> = ({ institution, category, id
         </div>
       </div>
       
-      <Link to={`/book/${category}/${id}`} className="w-full">
+      <Link to={`/book/${category}/${id}`} onClick={handleBookClick} className="w-full">
         <Button size="lg" className="w-full">
           Book Your Slot
         </Button>

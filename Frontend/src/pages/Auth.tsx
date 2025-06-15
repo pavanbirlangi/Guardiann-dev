@@ -11,12 +11,13 @@ import { useToast } from "@/components/ui/use-toast";
 import { Separator } from "@/components/ui/separator";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useAuth } from "@/hooks/useAuth";
+import { Link } from "react-router-dom";
 
 const Auth = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState<string>("login");
+  const [activeTab, setActiveTab] = useState<string>(searchParams.get('tab') || "login");
   
   const {
     loading,
@@ -384,7 +385,10 @@ const Auth = () => {
                           htmlFor="terms"
                           className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
                         >
-                          I agree to the terms and conditions
+                          I agree to the{" "}
+                          <Link to="/terms" className="text-education-600 hover:underline">
+                            terms and conditions
+                          </Link>
                         </label>
                       </div>
                         <Button 
@@ -615,10 +619,10 @@ const Auth = () => {
               <CardFooter className="flex flex-wrap items-center justify-between text-sm">
                 <span>© 2025 Guardiann</span>
                 <div className="flex space-x-4">
-                  <a href="#" className="text-education-600 hover:underline">
+                  <a href="/terms" className="text-education-600 hover:underline">
                     Terms
                   </a>
-                  <a href="#" className="text-education-600 hover:underline">
+                  <a href="/privacy" className="text-education-600 hover:underline">
                     Privacy
                   </a>
                 </div>

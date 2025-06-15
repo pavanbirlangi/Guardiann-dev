@@ -1,8 +1,9 @@
-
 import React from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { MapPin } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
+import { toast } from "sonner";
 
 interface InstitutionHeaderProps {
   name: string;
@@ -19,6 +20,20 @@ const InstitutionHeader: React.FC<InstitutionHeaderProps> = ({
   category,
   id,
 }) => {
+  const { isAuthenticated } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  const handleBookClick = (e: React.MouseEvent) => {
+    if (!isAuthenticated) {
+      e.preventDefault();
+      toast.error("Please login to book your visit");
+      // Store the current URL in localStorage before redirecting
+      localStorage.setItem('redirectAfterLogin', location.pathname);
+      navigate("/auth");
+    }
+  };
+
   return (
     <div className="bg-education-700 text-white py-8">
       <div className="container">
@@ -36,7 +51,7 @@ const InstitutionHeader: React.FC<InstitutionHeaderProps> = ({
               <span>{rating}</span>
               <span className="ml-1 text-yellow-500">★</span>
             </span>
-            <Link to={`/book/${category}/${id}`}>
+            <Link to={`/book/${category}/${id}`} onClick={handleBookClick}>
               <Button size="lg" className="bg-white text-education-700 hover:bg-gray-100">
                 Book a Slot
               </Button>

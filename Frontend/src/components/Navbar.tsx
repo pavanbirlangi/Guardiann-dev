@@ -22,8 +22,8 @@ const Navbar = () => {
     setMenuOpen(!menuOpen);
   };
 
-  const handleAuthClick = () => {
-    navigate("/auth");
+  const handleAuthClick = (tab?: string) => {
+    navigate(tab ? `/auth?tab=${tab}` : "/auth");
     if (menuOpen) setMenuOpen(false);
   };
 
@@ -97,14 +97,14 @@ const Navbar = () => {
                     variant="outline" 
                     size="sm" 
                     className="border-education-600 text-education-600 hover:bg-education-50"
-                    onClick={handleAuthClick}
+                    onClick={() => handleAuthClick('login')}
                   >
                     Login
                   </Button>
                   <Button 
                     size="sm" 
                     className="bg-education-600 hover:bg-education-700"
-                    onClick={handleAuthClick}
+                    onClick={() => handleAuthClick('register')}
                   >
                     Sign Up
                   </Button>
@@ -183,13 +183,13 @@ const Navbar = () => {
                     <Button 
                       variant="outline" 
                       className="border-education-600 text-education-600 hover:bg-education-50 w-full"
-                      onClick={handleAuthClick}
+                      onClick={() => handleAuthClick('login')}
                     >
                       Login
                     </Button>
                     <Button 
                       className="bg-education-600 hover:bg-education-700 w-full"
-                      onClick={handleAuthClick}
+                      onClick={() => handleAuthClick('register')}
                     >
                       Sign Up
                     </Button>

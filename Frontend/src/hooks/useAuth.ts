@@ -172,8 +172,15 @@ export const useAuth = () => {
       localStorage.setItem('user', JSON.stringify(user));
       
       console.log('Updating auth state...');
-      // Update auth state and redirect based on role
-      const targetRoute = user.role === 'ADMIN' ? '/admin/dashboard' : '/';
+      // Check for redirect URL
+      const redirectUrl = localStorage.getItem('redirectAfterLogin');
+      const targetRoute = redirectUrl || (user.role === 'ADMIN' ? '/admin/dashboard' : '/');
+      
+      // Clear the redirect URL
+      if (redirectUrl) {
+        localStorage.removeItem('redirectAfterLogin');
+      }
+
       setAuthState({
         isAuthenticated: true,
         user,
@@ -288,8 +295,15 @@ export const useAuth = () => {
       localStorage.setItem('user', JSON.stringify(user));
       
       console.log('Updating auth state...');
-      // Update auth state and redirect based on role
-      const targetRoute = user.role === 'ADMIN' ? '/admin/dashboard' : '/';
+      // Check for redirect URL
+      const redirectUrl = localStorage.getItem('redirectAfterLogin');
+      const targetRoute = redirectUrl || (user.role === 'ADMIN' ? '/admin/dashboard' : '/');
+      
+      // Clear the redirect URL
+      if (redirectUrl) {
+        localStorage.removeItem('redirectAfterLogin');
+      }
+
       setAuthState({
         isAuthenticated: true,
         user,
