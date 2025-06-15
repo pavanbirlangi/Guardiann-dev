@@ -17,10 +17,13 @@ const InstitutionListing = () => {
   const [filterOpen, setFilterOpen] = useState(false);
   const [cityFilter, setCityFilter] = useState<string | null>(null);
   const [typeFilter, setTypeFilter] = useState<string | null>(null);
+  const [feeRangeFilter, setFeeRangeFilter] = useState<string | null>(null);
   const [institutions, setInstitutions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [categoryData, setCategoryData] = useState<Category | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filteredInstitutions, setFilteredInstitutions] = useState<any[]>([]);
 
   useEffect(() => {
     const fetchCategory = async () => {
@@ -56,6 +59,7 @@ const InstitutionListing = () => {
         
         if (response.data.success) {
           setInstitutions(response.data.data || []);
+          setFilteredInstitutions(response.data.data || []);
         } else {
           throw new Error(response.data.message || 'Failed to fetch institutions');
         }
@@ -71,6 +75,50 @@ const InstitutionListing = () => {
       fetchInstitutions();
     }
   }, [category]);
+
+  // Apply search and filters
+  useEffect(() => {
+    let filtered = [...institutions];
+
+    // Apply search
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(inst => 
+        inst.name.toLowerCase().includes(query) ||
+        inst.address.toLowerCase().includes(query) ||
+        inst.type.toLowerCase().includes(query)
+      );
+    }
+
+    // Apply city filter
+    if (cityFilter) {
+      filtered = filtered.filter(inst => inst.city === cityFilter);
+    }
+
+    // Apply type filter
+    if (typeFilter) {
+      filtered = filtered.filter(inst => inst.type === typeFilter);
+    }
+
+    // Apply fee range filter
+    if (feeRangeFilter) {
+      filtered = filtered.filter(inst => {
+        const startingFee = parseFloat(inst.starting_from);
+        switch (feeRangeFilter) {
+          case 'under-50k':
+            return startingFee < 50000;
+          case '50k-100k':
+            return startingFee >= 50000 && startingFee <= 100000;
+          case 'above-100k':
+            return startingFee > 100000;
+          default:
+            return true;
+        }
+      });
+    }
+
+    setFilteredInstitutions(filtered);
+  }, [searchQuery, cityFilter, typeFilter, feeRangeFilter, institutions]);
 
   if (!category || !categoryData) {
     return (
@@ -92,17 +140,12 @@ const InstitutionListing = () => {
   const cities = [...new Set(institutions.map(inst => inst.city))];
   const types = [...new Set(institutions.map(inst => inst.type))];
 
-  // Apply filters
-  const filteredInstitutions = institutions.filter(inst => {
-    if (cityFilter && inst.city !== cityFilter) return false;
-    if (typeFilter && inst.type !== typeFilter) return false;
-    return true;
-  });
-
   // Clear all filters
   const clearFilters = () => {
     setCityFilter(null);
     setTypeFilter(null);
+    setSearchQuery("");
+    setFeeRangeFilter(null);
   };
 
   if (loading) {
@@ -144,6 +187,8 @@ const InstitutionListing = () => {
                 type="text"
                 placeholder={`Search ${categoryTitle.toLowerCase()}...`}
                 className="pl-10 p-2 border rounded-md w-full focus:outline-none focus:ring-2 focus:ring-education-500 focus:border-education-500"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
             
@@ -209,27 +254,36 @@ const InstitutionListing = () => {
                   </div>
                 </div>
 
-                {/* Fee range filter - placeholder */}
+                {/* Fee range filter */}
                 <div>
                   <h3 className="text-sm font-medium mb-3">Fee Range</h3>
                   <div className="space-y-2">
                     <label className="flex items-center">
                       <input
-                        type="checkbox"
+                        type="radio"
+                        name="feeRange"
+                        checked={feeRangeFilter === 'under-50k'}
+                        onChange={() => setFeeRangeFilter('under-50k')}
                         className="mr-2 h-4 w-4 text-education-600 focus:ring-education-500"
                       />
                       Under ₹50,000
                     </label>
                     <label className="flex items-center">
                       <input
-                        type="checkbox"
+                        type="radio"
+                        name="feeRange"
+                        checked={feeRangeFilter === '50k-100k'}
+                        onChange={() => setFeeRangeFilter('50k-100k')}
                         className="mr-2 h-4 w-4 text-education-600 focus:ring-education-500"
                       />
                       ₹50,000 - ₹1,00,000
                     </label>
                     <label className="flex items-center">
                       <input
-                        type="checkbox"
+                        type="radio"
+                        name="feeRange"
+                        checked={feeRangeFilter === 'above-100k'}
+                        onChange={() => setFeeRangeFilter('above-100k')}
                         className="mr-2 h-4 w-4 text-education-600 focus:ring-education-500"
                       />
                       Above ₹1,00,000
@@ -244,8 +298,14 @@ const InstitutionListing = () => {
           <div className="mb-6">
             <p className="text-gray-600">
               Showing {filteredInstitutions.length} {filteredInstitutions.length === 1 ? 'result' : 'results'}
+              {searchQuery && ` for "${searchQuery}"`}
               {cityFilter && ` in ${cityFilter}`}
               {typeFilter && ` for ${typeFilter}`}
+              {feeRangeFilter && (
+                feeRangeFilter === 'under-50k' ? ' under ₹50,000' :
+                feeRangeFilter === '50k-100k' ? ' between ₹50,000 - ₹1,00,000' :
+                ' above ₹1,00,000'
+              )}
             </p>
           </div>
 
