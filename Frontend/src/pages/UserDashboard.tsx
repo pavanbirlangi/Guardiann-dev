@@ -267,7 +267,11 @@ const UserDashboard = () => {
                                     </div>
                                     <div className="text-sm text-gray-600 mb-2">
                                       <p><span className="font-medium">Booking ID:</span> {booking.booking_id}</p>
-                                      <p><span className="font-medium">Visit Date:</span> {booking.visit_date} at {booking.visit_time}</p>
+                                      <p><span className="font-medium">Visit Date:</span> {new Date(booking.visit_date).toLocaleDateString('en-IN', {
+                                        year: 'numeric',
+                                        month: '2-digit',
+                                        day: '2-digit'
+                                      })} at {booking.visit_time}</p>
                                       <p><span className="font-medium">Amount:</span> ₹{booking.amount}</p>
                                       {booking.visitor_name && (
                                         <p><span className="font-medium">Visitor:</span> {booking.visitor_name}</p>

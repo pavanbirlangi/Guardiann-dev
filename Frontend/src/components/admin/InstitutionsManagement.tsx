@@ -1124,7 +1124,8 @@ const InstitutionsManagement = () => {
                   </div>
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="status" className="text-right">Status</Label>
+                <Label htmlFor="status" className="text-right"></Label>
+                {/*
                 <Select 
                     value={formData.is_active ? "active" : "inactive"} 
                     onValueChange={(value) => setFormData(prev => ({ ...prev, is_active: value === "active" }))}
@@ -1137,7 +1138,8 @@ const InstitutionsManagement = () => {
                     <SelectItem value="inactive">Inactive</SelectItem>
                   </SelectContent>
                 </Select>
-                </div>
+                */}
+              </div>
               </div>
             </div>
             <DialogFooter>

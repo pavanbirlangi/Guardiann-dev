@@ -228,9 +228,10 @@ const getAllBookings = async (req, res) => {
                 b.booking_date,
                 b.visit_date,
                 b.visit_time,
-                b.amount,
+                CAST(b.amount AS FLOAT) as amount,
                 b.status,
                 b.payment_id,
+                b.pdf_url,
                 i.name as institution_name,
                 c.name as category_name
             FROM bookings b
@@ -377,6 +378,402 @@ const downloadBookingReceipt = async (req, res) => {
     }
 };
 
+/**
+ * Get admin dashboard statistics
+ */
+const getAdminStats = async (req, res) => {
+  try {
+    // Get total stats with monthly growth
+    const totalStatsQuery = `
+      WITH current_month AS (
+        SELECT 
+          (SELECT COUNT(*) FROM categories WHERE is_active = true) as total_categories,
+          (SELECT COUNT(*) FROM institutions) as total_institutions,
+          (SELECT COUNT(*) FROM bookings) as total_bookings,
+          (SELECT COALESCE(SUM(CAST(amount AS FLOAT)), 0) FROM bookings WHERE status = 'confirmed') as total_revenue
+      ),
+      last_month AS (
+        SELECT 
+          (SELECT COUNT(*) FROM categories WHERE is_active = true) as last_month_categories,
+          (SELECT COUNT(*) FROM institutions) as last_month_institutions,
+          (SELECT COUNT(*) FROM bookings WHERE created_at >= DATE_TRUNC('month', CURRENT_DATE - INTERVAL '1 month')
+          AND created_at < DATE_TRUNC('month', CURRENT_DATE)) as last_month_bookings,
+          (SELECT COALESCE(SUM(CAST(amount AS FLOAT)), 0) FROM bookings 
+           WHERE status = 'confirmed' 
+           AND created_at >= DATE_TRUNC('month', CURRENT_DATE - INTERVAL '1 month')
+           AND created_at < DATE_TRUNC('month', CURRENT_DATE)) as last_month_revenue
+      ),
+      this_month AS (
+        SELECT 
+          (SELECT COUNT(*) FROM categories WHERE is_active = true) as new_categories,
+          (SELECT COUNT(*) FROM institutions) as new_institutions,
+          (SELECT COUNT(*) FROM bookings WHERE created_at >= DATE_TRUNC('month', CURRENT_DATE)) as new_bookings
+      )
+      SELECT 
+        t.total_categories,
+        t.total_institutions,
+        t.total_bookings,
+        t.total_revenue,
+        tm.new_categories as categories_growth,
+        tm.new_institutions as institutions_growth,
+        tm.new_bookings as bookings_growth,
+        CASE 
+          WHEN lm.last_month_revenue = 0 THEN 0
+          ELSE TRUNC(((t.total_revenue - lm.last_month_revenue)::numeric / lm.last_month_revenue) * 1000) / 10
+        END as revenue_growth
+      FROM current_month t
+      CROSS JOIN last_month lm
+      CROSS JOIN this_month tm
+    `;
+
+    const totalStatsResult = await pool.query(totalStatsQuery);
+    const totalStats = totalStatsResult.rows[0];
+
+    // Get recent bookings
+    const recentBookingsQuery = `
+      SELECT 
+        b.id as booking_id,
+        b.visitor_name,
+        b.visitor_email,
+        b.booking_date,
+        b.status,
+        CAST(b.amount AS FLOAT) as amount,
+        i.name as institution_name,
+        c.name as category_name
+      FROM bookings b
+      JOIN institutions i ON b.institution_id = i.id
+      JOIN categories c ON i.category_id = c.id
+      ORDER BY b.created_at DESC
+      LIMIT 5
+    `;
+
+    // Get monthly stats for the last 6 months
+    const monthlyStatsQuery = `
+      SELECT 
+        TO_CHAR(DATE_TRUNC('month', b.created_at), 'Mon YYYY') as month,
+        COUNT(*) as bookings,
+        COALESCE(SUM(CASE WHEN b.status = 'confirmed' THEN CAST(b.amount AS FLOAT) ELSE 0 END), 0) as revenue
+      FROM bookings b
+      WHERE b.created_at >= DATE_TRUNC('month', CURRENT_DATE - INTERVAL '5 months')
+      GROUP BY DATE_TRUNC('month', b.created_at)
+      ORDER BY DATE_TRUNC('month', b.created_at)
+    `;
+
+    // Get category distribution
+    const categoryStatsQuery = `
+      WITH category_data AS (
+        SELECT 
+          c.name,
+          COUNT(b.id) as value,
+          ROW_NUMBER() OVER (ORDER BY COUNT(b.id) DESC) as rn
+        FROM categories c
+        LEFT JOIN institutions i ON c.id = i.category_id
+        LEFT JOIN bookings b ON i.id = b.institution_id AND b.status = 'confirmed'
+        WHERE c.is_active = true
+        GROUP BY c.name, c.id
+      )
+      SELECT 
+        name,
+        value,
+        CASE 
+          WHEN rn % 8 = 1 THEN '#3b82f6'  -- Blue
+          WHEN rn % 8 = 2 THEN '#10b981'  -- Green
+          WHEN rn % 8 = 3 THEN '#f59e0b'  -- Orange
+          WHEN rn % 8 = 4 THEN '#8b5cf6'  -- Purple
+          WHEN rn % 8 = 5 THEN '#ef4444'  -- Red
+          WHEN rn % 8 = 6 THEN '#06b6d4'  -- Cyan
+          WHEN rn % 8 = 7 THEN '#f97316'  -- Deep Orange
+          ELSE '#6b7280'                  -- Gray
+        END as color
+      FROM category_data
+      ORDER BY value DESC
+    `;
+
+    // Get institution growth
+    const institutionGrowthQuery = `
+      SELECT 
+        TO_CHAR(DATE_TRUNC('month', created_at), 'Mon YYYY') as month,
+        COUNT(*) as institutions
+      FROM institutions
+      WHERE created_at >= DATE_TRUNC('month', CURRENT_DATE - INTERVAL '5 months')
+      GROUP BY DATE_TRUNC('month', created_at)
+      ORDER BY DATE_TRUNC('month', created_at)
+    `;
+
+    const [recentBookings, monthlyStats, categoryStats, institutionGrowth] = await Promise.all([
+      pool.query(recentBookingsQuery),
+      pool.query(monthlyStatsQuery),
+      pool.query(categoryStatsQuery),
+      pool.query(institutionGrowthQuery)
+    ]);
+
+    // Format the data for the frontend
+    const formattedCategoryStats = categoryStats.rows.map(row => ({
+      name: row.name,
+      value: parseInt(row.value) || 0,
+      color: row.color
+    }));
+
+    res.json({
+      success: true,
+      data: {
+        totalStats: {
+          totalCategories: parseInt(totalStats.total_categories),
+          totalInstitutions: parseInt(totalStats.total_institutions),
+          totalBookings: parseInt(totalStats.total_bookings),
+          totalRevenue: parseFloat(totalStats.total_revenue),
+          categoriesGrowth: parseInt(totalStats.categories_growth),
+          institutionsGrowth: parseInt(totalStats.institutions_growth),
+          bookingsGrowth: parseInt(totalStats.bookings_growth),
+          revenueGrowth: parseFloat(totalStats.revenue_growth)
+        },
+        recentBookings: recentBookings.rows,
+        monthlyStats: monthlyStats.rows,
+        categoryStats: formattedCategoryStats,
+        institutionGrowth: institutionGrowth.rows
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching admin stats:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch admin statistics'
+    });
+  }
+};
+
+/**
+ * Get platform settings
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
+const getPlatformSettings = async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT * FROM platform_settings ORDER BY id DESC LIMIT 1'
+    );
+
+    if (result.rows.length === 0) {
+      // If no settings exist, create default settings
+      const defaultSettings = {
+        site_name: 'Guardiann',
+        site_description: 'Your trusted partner in finding the perfect educational institution',
+        contact_email: 'admin@guardiann.com',
+        support_phone: '+91 98765 43210',
+        address: {
+          street: '',
+          city: '',
+          state: '',
+          country: 'India',
+          pincode: ''
+        },
+        social_media: {
+          facebook: '',
+          twitter: '',
+          instagram: '',
+          linkedin: ''
+        }
+      };
+
+      const insertResult = await pool.query(
+        'INSERT INTO platform_settings (site_name, site_description, contact_email, support_phone, address, social_media) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+        [
+          defaultSettings.site_name,
+          defaultSettings.site_description,
+          defaultSettings.contact_email,
+          defaultSettings.support_phone,
+          JSON.stringify(defaultSettings.address),
+          JSON.stringify(defaultSettings.social_media)
+        ]
+      );
+
+      return res.json({
+        success: true,
+        data: {
+          siteName: insertResult.rows[0].site_name,
+          siteDescription: insertResult.rows[0].site_description,
+          contactEmail: insertResult.rows[0].contact_email,
+          supportPhone: insertResult.rows[0].support_phone,
+          address: insertResult.rows[0].address,
+          socialMedia: insertResult.rows[0].social_media
+        }
+      });
+    }
+
+    const settings = result.rows[0];
+    res.json({
+      success: true,
+      data: {
+        siteName: settings.site_name,
+        siteDescription: settings.site_description,
+        contactEmail: settings.contact_email,
+        supportPhone: settings.support_phone,
+        address: settings.address,
+        socialMedia: settings.social_media
+      }
+    });
+  } catch (error) {
+    console.error('Error getting platform settings:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get platform settings'
+    });
+  }
+};
+
+/**
+ * Update platform settings
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
+const updatePlatformSettings = async (req, res) => {
+  try {
+    const {
+      siteName,
+      siteDescription,
+      contactEmail,
+      supportPhone,
+      address,
+      socialMedia
+    } = req.body;
+
+    // Validate required fields
+    if (!siteName || !contactEmail) {
+      return res.status(400).json({
+        success: false,
+        message: 'Site name and contact email are required'
+      });
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(contactEmail)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid email format'
+      });
+    }
+
+    // Validate phone number format (basic validation)
+    const phoneRegex = /^\+?[\d\s-]{10,}$/;
+    if (supportPhone && !phoneRegex.test(supportPhone)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid phone number format'
+      });
+    }
+
+    // Check if settings exist
+    const checkResult = await pool.query(
+      'SELECT id FROM platform_settings ORDER BY id DESC LIMIT 1'
+    );
+
+    let result;
+    if (checkResult.rows.length === 0) {
+      // Insert new settings if none exist
+      result = await pool.query(
+        `INSERT INTO platform_settings 
+         (site_name, site_description, contact_email, support_phone, address, social_media)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         RETURNING *`,
+        [
+          siteName,
+          siteDescription,
+          contactEmail,
+          supportPhone,
+          JSON.stringify(address),
+          JSON.stringify(socialMedia)
+        ]
+      );
+    } else {
+      // Update existing settings
+      result = await pool.query(
+        `UPDATE platform_settings 
+         SET site_name = $1,
+             site_description = $2,
+             contact_email = $3,
+             support_phone = $4,
+             address = $5,
+             social_media = $6,
+             updated_at = CURRENT_TIMESTAMP
+         WHERE id = $7
+         RETURNING *`,
+        [
+          siteName,
+          siteDescription,
+          contactEmail,
+          supportPhone,
+          JSON.stringify(address),
+          JSON.stringify(socialMedia),
+          checkResult.rows[0].id
+        ]
+      );
+    }
+
+    if (result.rows.length === 0) {
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to update settings'
+      });
+    }
+
+    const settings = result.rows[0];
+    res.json({
+      success: true,
+      data: {
+        siteName: settings.site_name,
+        siteDescription: settings.site_description,
+        contactEmail: settings.contact_email,
+        supportPhone: settings.support_phone,
+        address: settings.address,
+        socialMedia: settings.social_media
+      },
+      message: 'Settings updated successfully'
+    });
+  } catch (error) {
+    console.error('Error updating platform settings:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update platform settings'
+    });
+  }
+};
+
+const getPublicPlatformSettings = async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT 
+        site_name as "siteName",
+        site_description as "siteDescription",
+        contact_email as "contactEmail",
+        support_phone as "supportPhone",
+        address,
+        social_media as "socialMedia"
+      FROM platform_settings 
+      ORDER BY id DESC 
+      LIMIT 1`
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Platform settings not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: result.rows[0]
+    });
+  } catch (error) {
+    console.error('Error fetching public platform settings:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching platform settings'
+    });
+  }
+};
+
 module.exports = {
     getAllCategories,
     addCategory,
@@ -384,5 +781,9 @@ module.exports = {
     deleteCategory,
     getAllBookings,
     updateBookingStatus,
-    downloadBookingReceipt
+    downloadBookingReceipt,
+    getAdminStats,
+    getPlatformSettings,
+    updatePlatformSettings,
+    getPublicPlatformSettings
 }; 

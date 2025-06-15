@@ -1,384 +1,323 @@
-import React, { useState } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useState, useEffect } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Switch } from "@/components/ui/switch";
-import { Separator } from "@/components/ui/separator";
-import { Save, Globe, Mail, Shield, CreditCard, LogOut } from "lucide-react";
-import { toast } from "sonner";
-import axiosInstance from "@/lib/axios";
+import { Facebook, Twitter, Instagram, Linkedin, LogOut } from 'lucide-react';
+import { toast } from 'react-hot-toast';
+import axios from 'axios';
+import { useAuth } from '@/hooks/useAuth';
+
+// Create axios instance with base URL
+const api = axios.create({
+  baseURL: 'http://localhost:3000',
+  headers: {
+    'Content-Type': 'application/json'
+  }
+});
+
+// Add request interceptor to include auth token
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('accessToken');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
+interface Address {
+  street: string;
+  city: string;
+  state: string;
+  country: string;
+  pincode: string;
+}
+
+interface SocialMedia {
+  facebook: string;
+  twitter: string;
+  instagram: string;
+  linkedin: string;
+}
+
+interface Settings {
+  siteName: string;
+  siteDescription: string;
+  contactEmail: string;
+  supportPhone: string;
+  address: Address;
+  socialMedia: SocialMedia;
+}
 
 interface ApiResponse {
   success: boolean;
-  message?: string;
-  data?: any;
+  data: Settings;
 }
 
 const SettingsManagement = () => {
-  const [settings, setSettings] = useState({
-    // General Settings
-    siteName: "EduConnect",
-    siteDescription: "Your trusted partner in finding the perfect educational institution",
-    contactEmail: "admin@educonnect.com",
-    supportPhone: "+91 98765 43210",
-    
-    // Booking Settings
-    defaultBookingAmount: 2000,
-    enableOnlinePayment: true,
-    requireEmailVerification: true,
-    autoConfirmBookings: false,
-    
-    // Email Settings
-    emailHost: "smtp.gmail.com",
-    emailPort: 587,
-    emailUsername: "noreply@educonnect.com",
-    emailPassword: "",
-    
-    // Notification Settings
-    sendBookingConfirmation: true,
-    sendReminderEmails: true,
-    sendMarketingEmails: false,
-    adminNotifications: true,
-    
-    // Security Settings
-    enableTwoFactorAuth: false,
-    sessionTimeout: 30,
-    maxLoginAttempts: 5,
-    
-    // Platform Settings
-    maintenanceMode: false,
-    allowNewRegistrations: true,
-    enableReviews: true,
-    moderateReviews: true
+  const { logout } = useAuth();
+  const [settings, setSettings] = useState<Settings>({
+    siteName: '',
+    siteDescription: '',
+    contactEmail: '',
+    supportPhone: '',
+    address: {
+      street: '',
+      city: '',
+      state: '',
+      country: 'India',
+      pincode: ''
+    },
+    socialMedia: {
+      facebook: '',
+      twitter: '',
+      instagram: '',
+      linkedin: ''
+    }
   });
 
-  const handleSettingChange = (key, value) => {
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    fetchSettings();
+  }, []);
+
+  const fetchSettings = async () => {
+    try {
+      const response = await api.get<ApiResponse>('/api/dashboard/admin/settings');
+      if (response.data.success) {
+        setSettings(response.data.data);
+      }
+    } catch (error) {
+      console.error('Error fetching settings:', error);
+      toast.error('Failed to load settings');
+    }
+  };
+
+  const handleSettingChange = (field: keyof Settings, value: string) => {
     setSettings(prev => ({
       ...prev,
-      [key]: value
+      [field]: value
     }));
   };
 
-  const handleSave = () => {
-    // In a real app, this would save to a backend
-    toast.success("Settings saved successfully!");
+  const handleAddressChange = (field: keyof Address, value: string) => {
+    setSettings(prev => ({
+      ...prev,
+      address: {
+        ...prev.address,
+        [field]: value
+      }
+    }));
+  };
+
+  const handleSocialMediaChange = (platform: keyof SocialMedia, value: string) => {
+    setSettings(prev => ({
+      ...prev,
+      socialMedia: {
+        ...prev.socialMedia,
+        [platform]: value
+      }
+    }));
+  };
+
+  const handleSaveSettings = async () => {
+    setLoading(true);
+    try {
+      const response = await api.put<ApiResponse>('/api/dashboard/admin/settings', settings);
+      if (response.data.success) {
+        toast.success('Settings saved successfully');
+      }
+    } catch (error) {
+      console.error('Error saving settings:', error);
+      toast.error('Failed to save settings');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleLogout = async () => {
     try {
-      const accessToken = localStorage.getItem('accessToken');
-      if (!accessToken) {
-        toast.error('No access token found');
-        return;
-      }
-
-      try {
-        const response = await axiosInstance.post<ApiResponse>('/auth/logout', {
-          accessToken
-        });
-
-        if (response.data.success) {
-          toast.success('Logged out successfully');
-        } else {
-          toast.error(response.data.message || 'Failed to logout from server');
-        }
-      } catch (error: any) {
-        console.error('Server logout error:', error);
-        toast.error('Failed to logout from server, but logged out locally');
-      }
-
-      // Always perform local logout regardless of server response
-      localStorage.removeItem('accessToken');
-      localStorage.removeItem('idToken');
-      localStorage.removeItem('refreshToken');
-      localStorage.removeItem('user');
-      window.location.href = '/auth';
-    } catch (error: any) {
+      await logout();
+    } catch (error) {
       console.error('Logout error:', error);
-      // Even if everything fails, try to clear storage and redirect
-      localStorage.removeItem('accessToken');
-      localStorage.removeItem('idToken');
-      localStorage.removeItem('refreshToken');
-      localStorage.removeItem('user');
-      window.location.href = '/auth';
+      toast.error('Failed to logout');
     }
   };
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold">Platform Settings</h2>
-        <p className="text-gray-600">Configure your platform settings and preferences</p>
-      </div>
-
-      <div className="space-y-6">
-        {/* General Settings */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Globe className="h-5 w-5" />
-              General Settings
-            </CardTitle>
-            <CardDescription>Basic platform configuration</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="siteName">Site Name</Label>
-                <Input
-                  id="siteName"
-                  value={settings.siteName}
-                  onChange={(e) => handleSettingChange("siteName", e.target.value)}
-                />
-              </div>
-              <div>
-                <Label htmlFor="contactEmail">Contact Email</Label>
-                <Input
-                  id="contactEmail"
-                  type="email"
-                  value={settings.contactEmail}
-                  onChange={(e) => handleSettingChange("contactEmail", e.target.value)}
-                />
-              </div>
-            </div>
-            <div>
-              <Label htmlFor="siteDescription">Site Description</Label>
-              <Textarea
-                id="siteDescription"
-                value={settings.siteDescription}
-                onChange={(e) => handleSettingChange("siteDescription", e.target.value)}
+      <Card>
+        <CardHeader>
+          <CardTitle>General Settings</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <Label htmlFor="siteName">Site Name</Label>
+              <Input
+                id="siteName"
+                value={settings.siteName}
+                onChange={(e) => handleSettingChange('siteName', e.target.value)}
+                placeholder="Enter site name"
               />
             </div>
-            <div>
+            <div className="space-y-2">
+              <Label htmlFor="contactEmail">Contact Email</Label>
+              <Input
+                id="contactEmail"
+                type="email"
+                value={settings.contactEmail}
+                onChange={(e) => handleSettingChange('contactEmail', e.target.value)}
+                placeholder="Enter contact email"
+              />
+            </div>
+            <div className="space-y-2">
               <Label htmlFor="supportPhone">Support Phone</Label>
               <Input
                 id="supportPhone"
                 value={settings.supportPhone}
-                onChange={(e) => handleSettingChange("supportPhone", e.target.value)}
+                onChange={(e) => handleSettingChange('supportPhone', e.target.value)}
+                placeholder="Enter support phone"
               />
             </div>
-          </CardContent>
-        </Card>
+            <div className="space-y-2">
+              <Label htmlFor="siteDescription">Site Description</Label>
+              <Textarea
+                id="siteDescription"
+                value={settings.siteDescription}
+                onChange={(e) => handleSettingChange('siteDescription', e.target.value)}
+                placeholder="Enter site description"
+              />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
-        {/* Booking Settings */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <CreditCard className="h-5 w-5" />
-              Booking Settings
-            </CardTitle>
-            <CardDescription>Configure booking and payment settings</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="defaultBookingAmount">Default Booking Amount (₹)</Label>
-                <Input
-                  id="defaultBookingAmount"
-                  type="number"
-                  value={settings.defaultBookingAmount}
-                  onChange={(e) => handleSettingChange("defaultBookingAmount", parseInt(e.target.value))}
-                />
-              </div>
+      <Card>
+        <CardHeader>
+          <CardTitle>Address Information</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <Label htmlFor="street">Street Address</Label>
+              <Input
+                id="street"
+                value={settings.address.street}
+                onChange={(e) => handleAddressChange('street', e.target.value)}
+                placeholder="Enter street address"
+              />
             </div>
-            <Separator />
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label>Enable Online Payment</Label>
-                  <p className="text-sm text-gray-600">Allow users to pay online during booking</p>
-                </div>
-                <Switch
-                  checked={settings.enableOnlinePayment}
-                  onCheckedChange={(checked) => handleSettingChange("enableOnlinePayment", checked)}
-                />
-              </div>
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label>Require Email Verification</Label>
-                  <p className="text-sm text-gray-600">Users must verify email before booking</p>
-                </div>
-                <Switch
-                  checked={settings.requireEmailVerification}
-                  onCheckedChange={(checked) => handleSettingChange("requireEmailVerification", checked)}
-                />
-              </div>
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label>Auto-confirm Bookings</Label>
-                  <p className="text-sm text-gray-600">Automatically confirm bookings upon payment</p>
-                </div>
-                <Switch
-                  checked={settings.autoConfirmBookings}
-                  onCheckedChange={(checked) => handleSettingChange("autoConfirmBookings", checked)}
-                />
-              </div>
+            <div className="space-y-2">
+              <Label htmlFor="city">City</Label>
+              <Input
+                id="city"
+                value={settings.address.city}
+                onChange={(e) => handleAddressChange('city', e.target.value)}
+                placeholder="Enter city"
+              />
             </div>
-          </CardContent>
-        </Card>
+            <div className="space-y-2">
+              <Label htmlFor="state">State</Label>
+              <Input
+                id="state"
+                value={settings.address.state}
+                onChange={(e) => handleAddressChange('state', e.target.value)}
+                placeholder="Enter state"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="pincode">Pincode</Label>
+              <Input
+                id="pincode"
+                value={settings.address.pincode}
+                onChange={(e) => handleAddressChange('pincode', e.target.value)}
+                placeholder="Enter pincode"
+              />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
-        {/* Email Settings */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Mail className="h-5 w-5" />
-              Email Settings
-            </CardTitle>
-            <CardDescription>Configure SMTP settings for email notifications</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="emailHost">SMTP Host</Label>
-                <Input
-                  id="emailHost"
-                  value={settings.emailHost}
-                  onChange={(e) => handleSettingChange("emailHost", e.target.value)}
-                />
-              </div>
-              <div>
-                <Label htmlFor="emailPort">SMTP Port</Label>
-                <Input
-                  id="emailPort"
-                  type="number"
-                  value={settings.emailPort}
-                  onChange={(e) => handleSettingChange("emailPort", parseInt(e.target.value))}
-                />
-              </div>
-              <div>
-                <Label htmlFor="emailUsername">Email Username</Label>
-                <Input
-                  id="emailUsername"
-                  value={settings.emailUsername}
-                  onChange={(e) => handleSettingChange("emailUsername", e.target.value)}
-                />
-              </div>
-              <div>
-                <Label htmlFor="emailPassword">Email Password</Label>
-                <Input
-                  id="emailPassword"
-                  type="password"
-                  value={settings.emailPassword}
-                  onChange={(e) => handleSettingChange("emailPassword", e.target.value)}
-                />
-              </div>
+      <Card>
+        <CardHeader>
+          <CardTitle>Social Media Links</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <Label htmlFor="facebook" className="flex items-center gap-2">
+                <Facebook className="h-4 w-4 text-[#1877F2]" />
+                Facebook
+              </Label>
+              <Input
+                id="facebook"
+                type="url"
+                value={settings.socialMedia.facebook}
+                onChange={(e) => handleSocialMediaChange('facebook', e.target.value)}
+                placeholder="https://facebook.com/your-page"
+              />
             </div>
-            <Separator />
-            <div className="space-y-4">
-              <h4 className="font-medium">Notification Settings</h4>
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label>Send Booking Confirmations</Label>
-                  <p className="text-sm text-gray-600">Email confirmations to users</p>
-                </div>
-                <Switch
-                  checked={settings.sendBookingConfirmation}
-                  onCheckedChange={(checked) => handleSettingChange("sendBookingConfirmation", checked)}
-                />
-              </div>
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label>Send Reminder Emails</Label>
-                  <p className="text-sm text-gray-600">Remind users about upcoming visits</p>
-                </div>
-                <Switch
-                  checked={settings.sendReminderEmails}
-                  onCheckedChange={(checked) => handleSettingChange("sendReminderEmails", checked)}
-                />
-              </div>
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label>Admin Notifications</Label>
-                  <p className="text-sm text-gray-600">Notify admins of new bookings</p>
-                </div>
-                <Switch
-                  checked={settings.adminNotifications}
-                  onCheckedChange={(checked) => handleSettingChange("adminNotifications", checked)}
-                />
-              </div>
+            <div className="space-y-2">
+              <Label htmlFor="twitter" className="flex items-center gap-2">
+                <Twitter className="h-4 w-4 text-[#1DA1F2]" />
+                Twitter
+              </Label>
+              <Input
+                id="twitter"
+                type="url"
+                value={settings.socialMedia.twitter}
+                onChange={(e) => handleSocialMediaChange('twitter', e.target.value)}
+                placeholder="https://twitter.com/your-handle"
+              />
             </div>
-          </CardContent>
-        </Card>
+            <div className="space-y-2">
+              <Label htmlFor="instagram" className="flex items-center gap-2">
+                <Instagram className="h-4 w-4 text-[#E4405F]" />
+                Instagram
+              </Label>
+              <Input
+                id="instagram"
+                type="url"
+                value={settings.socialMedia.instagram}
+                onChange={(e) => handleSocialMediaChange('instagram', e.target.value)}
+                placeholder="https://instagram.com/your-profile"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="linkedin" className="flex items-center gap-2">
+                <Linkedin className="h-4 w-4 text-[#0A66C2]" />
+                LinkedIn
+              </Label>
+              <Input
+                id="linkedin"
+                type="url"
+                value={settings.socialMedia.linkedin}
+                onChange={(e) => handleSocialMediaChange('linkedin', e.target.value)}
+                placeholder="https://linkedin.com/in/your-profile"
+              />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
-        {/* Security Settings */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Shield className="h-5 w-5" />
-              Security Settings
-            </CardTitle>
-            <CardDescription>Configure security and access controls</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="sessionTimeout">Session Timeout (minutes)</Label>
-                <Input
-                  id="sessionTimeout"
-                  type="number"
-                  value={settings.sessionTimeout}
-                  onChange={(e) => handleSettingChange("sessionTimeout", parseInt(e.target.value))}
-                />
-              </div>
-              <div>
-                <Label htmlFor="maxLoginAttempts">Max Login Attempts</Label>
-                <Input
-                  id="maxLoginAttempts"
-                  type="number"
-                  value={settings.maxLoginAttempts}
-                  onChange={(e) => handleSettingChange("maxLoginAttempts", parseInt(e.target.value))}
-                />
-              </div>
-            </div>
-            <Separator />
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label>Enable Two-Factor Authentication</Label>
-                  <p className="text-sm text-gray-600">Require 2FA for admin accounts</p>
-                </div>
-                <Switch
-                  checked={settings.enableTwoFactorAuth}
-                  onCheckedChange={(checked) => handleSettingChange("enableTwoFactorAuth", checked)}
-                />
-              </div>
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label>Maintenance Mode</Label>
-                  <p className="text-sm text-gray-600">Put the platform in maintenance mode</p>
-                </div>
-                <Switch
-                  checked={settings.maintenanceMode}
-                  onCheckedChange={(checked) => handleSettingChange("maintenanceMode", checked)}
-                />
-              </div>
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label>Allow New Registrations</Label>
-                  <p className="text-sm text-gray-600">Allow new users to register</p>
-                </div>
-                <Switch
-                  checked={settings.allowNewRegistrations}
-                  onCheckedChange={(checked) => handleSettingChange("allowNewRegistrations", checked)}
-                />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Save Button */}
-        <div className="flex justify-end gap-4">
-          <Button onClick={handleLogout} variant="outline" className="flex items-center gap-2">
-            <LogOut className="h-4 w-4" />
-            Logout
-          </Button>
-          <Button onClick={handleSave} className="flex items-center gap-2">
-            <Save className="h-4 w-4" />
-            Save All Settings
-          </Button>
-        </div>
+      <div className="flex justify-end gap-4">
+        <Button 
+          variant="outline"
+          onClick={handleLogout}
+          className="flex items-center gap-2"
+        >
+          <LogOut className="h-4 w-4" />
+          Logout
+        </Button>
+        <Button 
+          onClick={handleSaveSettings}
+          disabled={loading}
+        >
+          {loading ? 'Saving...' : 'Save Settings'}
+        </Button>
       </div>
     </div>
   );

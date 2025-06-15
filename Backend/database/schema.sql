@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS users (
     city VARCHAR(100),
     state VARCHAR(100),
     country VARCHAR(100),
-    google_id VARCHAR(255) UNIQUE
+    google_id TEXT UNIQUE
 );
 
 -- Categories Table

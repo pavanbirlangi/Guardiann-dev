@@ -59,6 +59,7 @@ const CategoriesManagement = () => {
     display_order: 0,
     is_active: true
   });
+  const [failedIcons, setFailedIcons] = useState<Set<string>>(new Set());
 
   const iconMap = {
     School: <School className="h-6 w-6" />,
@@ -329,8 +330,15 @@ const CategoriesManagement = () => {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="p-2 bg-blue-100 rounded-lg text-blue-600">
-                      {category.icon_url ? (
-                        <img src={category.icon_url} alt={category.name} className="h-6 w-6" />
+                      {category.icon_url && !failedIcons.has(category.id) ? (
+                        <img 
+                          src={category.icon_url} 
+                          alt={category.name} 
+                          className="h-6 w-6 object-contain"
+                          onError={() => {
+                            setFailedIcons(prev => new Set([...prev, category.id]));
+                          }}
+                        />
                       ) : (
                         <School className="h-6 w-6" />
                       )}

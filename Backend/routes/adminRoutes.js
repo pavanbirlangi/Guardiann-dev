@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const adminController = require('../controllers/adminController');
 const { verifyToken, checkRole } = require('../middlewares/checkAuth');
 const {
     getAllCategories,
@@ -8,8 +9,47 @@ const {
     deleteCategory,
     getAllBookings,
     updateBookingStatus,
-    downloadBookingReceipt
+    downloadBookingReceipt,
+    getAdminStats
 } = require('../controllers/adminController');
+
+/**
+ * @swagger
+ * /api/settings:
+ *   get:
+ *     summary: Get public platform settings
+ *     tags: [Settings]
+ *     responses:
+ *       200:
+ *         description: Platform settings retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     siteName:
+ *                       type: string
+ *                     siteDescription:
+ *                       type: string
+ *                     contactEmail:
+ *                       type: string
+ *                     supportPhone:
+ *                       type: string
+ *                     address:
+ *                       type: object
+ *                     socialMedia:
+ *                       type: object
+ */
+router.get('/settings', adminController.getPublicPlatformSettings);
+
+// Admin routes with authentication
+router.use(verifyToken);
+router.use(checkRole(['ADMIN']));
 
 /**
  * @swagger
@@ -40,11 +80,7 @@ const {
  *       500:
  *         description: Server error
  */
-router.get('/categories',
-    verifyToken,
-    checkRole(['ADMIN']),
-    getAllCategories
-);
+router.get('/categories', getAllCategories);
 
 /**
  * @swagger
@@ -103,11 +139,7 @@ router.get('/categories',
  *       500:
  *         description: Server error
  */
-router.post('/categories',
-    verifyToken,
-    checkRole(['ADMIN']),
-    addCategory
-);
+router.post('/categories', addCategory);
 
 /**
  * @swagger
@@ -177,11 +209,7 @@ router.post('/categories',
  *       500:
  *         description: Server error
  */
-router.put('/categories/:id',
-    verifyToken,
-    checkRole(['ADMIN']),
-    updateCategory
-);
+router.put('/categories/:id', updateCategory);
 
 /**
  * @swagger
@@ -222,11 +250,7 @@ router.put('/categories/:id',
  *       500:
  *         description: Server error
  */
-router.delete('/categories/:id',
-    verifyToken,
-    checkRole(['ADMIN']),
-    deleteCategory
-);
+router.delete('/categories/:id', deleteCategory);
 
 /**
  * @swagger
@@ -324,11 +348,7 @@ router.delete('/categories/:id',
  *       500:
  *         description: Server error
  */
-router.get('/bookings',
-    verifyToken,
-    checkRole(['ADMIN']),
-    getAllBookings
-);
+router.get('/bookings', getAllBookings);
 
 /**
  * @swagger
@@ -383,11 +403,7 @@ router.get('/bookings',
  *       500:
  *         description: Server error
  */
-router.patch('/bookings/:bookingId/status',
-    verifyToken,
-    checkRole(['ADMIN']),
-    updateBookingStatus
-);
+router.put('/bookings/:bookingId/status', updateBookingStatus);
 
 /**
  * @swagger
@@ -421,10 +437,79 @@ router.patch('/bookings/:bookingId/status',
  *       500:
  *         description: Server error
  */
-router.get('/bookings/:bookingId/receipt',
-    verifyToken,
-    checkRole(['ADMIN']),
-    downloadBookingReceipt
-);
+router.get('/bookings/:bookingId/receipt', downloadBookingReceipt);
+
+/**
+ * @swagger
+ * /api/dashboard/admin/stats:
+ *   get:
+ *     summary: Get admin dashboard statistics
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Statistics retrieved successfully
+ *       401:
+ *         description: Unauthorized
+ *       500:
+ *         description: Server error
+ */
+router.get('/stats', getAdminStats);
+
+/**
+ * @swagger
+ * /api/dashboard/admin/settings:
+ *   get:
+ *     summary: Get platform settings
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Platform settings retrieved successfully
+ *       401:
+ *         description: Unauthorized
+ *       500:
+ *         description: Server error
+ */
+router.get('/settings', adminController.getPlatformSettings);
+
+/**
+ * @swagger
+ * /api/dashboard/admin/settings:
+ *   put:
+ *     summary: Update platform settings
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               siteName:
+ *                 type: string
+ *               siteDescription:
+ *                 type: string
+ *               contactEmail:
+ *                 type: string
+ *               supportPhone:
+ *                 type: string
+ *               address:
+ *                 type: object
+ *               socialMedia:
+ *                 type: object
+ *     responses:
+ *       200:
+ *         description: Settings updated successfully
+ *       401:
+ *         description: Unauthorized
+ *       500:
+ *         description: Server error
+ */
+router.put('/settings', adminController.updatePlatformSettings);
 
 module.exports = router; 

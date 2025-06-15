@@ -82,7 +82,7 @@ const handleGoogleCallback = async (req, res) => {
         }
 
         const userInfo = await userInfoResponse.json();
-        const { email, name, picture } = userInfo;
+        const { email, name, picture, id: googleId } = userInfo;
 
         let cognitoId;
         let isNewUser = false;
@@ -174,10 +174,10 @@ const handleGoogleCallback = async (req, res) => {
                     }
                 };
 
-                // Sync user to RDS
+                // Sync user to RDS with Google ID
                 try {
-                    console.log('Syncing new Google user to RDS:', { email, cognitoId });
-                    await syncUserToRDS(cognitoId, email);
+                    console.log('Syncing new Google user to RDS:', { email, cognitoId, googleId });
+                    await syncUserToRDS(cognitoId, email, googleId);
                 } catch (syncError) {
                     console.error('Error syncing new Google user to RDS:', syncError);
                 }
@@ -226,10 +226,10 @@ const handleGoogleCallback = async (req, res) => {
         // Get user role
         const role = await getUserRole(email);
 
-        // Sync user to RDS
+        // Sync user to RDS with Google ID
         try {
-            console.log('Syncing existing Google user to RDS:', { email, cognitoId });
-            await syncUserToRDS(cognitoId, email);
+            console.log('Syncing existing Google user to RDS:', { email, cognitoId, googleId });
+            await syncUserToRDS(cognitoId, email, googleId);
         } catch (syncError) {
             console.error('Error syncing existing Google user to RDS:', syncError);
         }

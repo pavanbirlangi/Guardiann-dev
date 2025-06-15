@@ -10,6 +10,7 @@ const categoryRoutes = require('./routes/categoryRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const institutionRoutes = require('./routes/institutionRoutes');
 const uploadRoutes = require('./routes/uploadRoutes');
+const settingsRoutes = require('./routes/settingsRoutes');
 
 const app = express();
 
@@ -57,6 +58,7 @@ app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/dashboard/admin', adminRoutes);
 app.use('/api/institutions', institutionRoutes);
+app.use('/api/settings', settingsRoutes);
 app.use('/api/upload', uploadRoutes);
 
 // Error handling middleware
@@ -101,11 +103,4 @@ process.on('SIGTERM', () => {
 
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
-//   console.log('Available routes:');
-//   console.log('- POST /api/auth/register');
-//   console.log('- POST /api/auth/login');
-//   console.log('- POST /api/auth/logout');
-//   console.log('- GET /api/dashboard/user');
-//   console.log('- GET /api/dashboard/admin');
-//   console.log('- GET /api-docs (Swagger Documentation)');
 }); 

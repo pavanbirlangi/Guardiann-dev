@@ -34,15 +34,35 @@ interface Booking {
   pdf_url?: string;
 }
 
+interface Category {
+  id: string;
+  name: string;
+  slug: string;
+}
+
 interface ApiResponse {
   success: boolean;
   data: Booking[];
+}
+
+interface CategoriesResponse {
+  success: boolean;
+  data: Category[];
 }
 
 const BookingsManagement = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [categoryFilter, setCategoryFilter] = useState("all");
+
+  // Fetch categories
+  const { data: categories } = useQuery<Category[]>({
+    queryKey: ['categories'],
+    queryFn: async () => {
+      const response = await api.get<CategoriesResponse>('/dashboard/admin/categories');
+      return response.data.data;
+    }
+  });
 
   const { data: bookingsData, isLoading, error } = useQuery<Booking[]>({
     queryKey: ['admin-bookings', statusFilter, categoryFilter, searchTerm],
@@ -65,19 +85,29 @@ const BookingsManagement = () => {
 
   const filteredBookings = bookingsData || [];
 
-  const handleStatusChange = async (bookingId: string, newStatus: string) => {
+  const handleViewReceipt = async (booking: Booking) => {
     try {
-      await api.patch(`/dashboard/admin/bookings/${bookingId}/status`, { status: newStatus });
-      toast.success(`Booking status updated to ${newStatus}`);
+      if (booking.pdf_url) {
+        // Open PDF in a new tab for viewing
+        window.open(booking.pdf_url, '_blank');
+      } else {
+        toast.error('Receipt not available');
+      }
     } catch (error) {
-      toast.error('Failed to update booking status');
+      toast.error('Failed to view receipt');
     }
   };
 
   const handleDownloadReceipt = async (booking: Booking) => {
     try {
       if (booking.pdf_url) {
-        window.open(booking.pdf_url, '_blank');
+        // Create a temporary link element
+        const link = document.createElement('a');
+        link.href = booking.pdf_url;
+        link.download = `booking-receipt-${booking.booking_id}.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
       } else {
         toast.error('Receipt not available');
       }
@@ -87,17 +117,28 @@ const BookingsManagement = () => {
   };
 
   const getStatusBadgeVariant = (status: string) => {
-    switch (status) {
-      case "confirmed": return "default";
-      case "pending": return "secondary";
-      case "cancelled": return "destructive";
-      default: return "secondary";
+    switch (status.toLowerCase()) {
+      case "confirmed":
+        return "default";
+      case "pending":
+        return "secondary";
+      case "cancelled":
+        return "destructive";
+      default:
+        return "secondary";
     }
+  };
+
+  const formatAmount = (amount: number | string): number => {
+    if (typeof amount === 'string') {
+      return parseFloat(amount.replace(/[₹,]/g, ''));
+    }
+    return amount;
   };
 
   const totalRevenue = bookingsData
     ?.filter(b => b.status === "confirmed")
-    .reduce((sum, booking) => sum + booking.amount, 0) || 0;
+    .reduce((sum, booking) => sum + formatAmount(booking.amount), 0) || 0;
 
   if (isLoading) {
     return (
@@ -116,7 +157,7 @@ const BookingsManagement = () => {
         </div>
         <div className="text-right">
           <p className="text-sm text-gray-600">Total Revenue</p>
-          <p className="text-2xl font-bold text-green-600">₹{totalRevenue.toLocaleString()}</p>
+          <p className="text-2xl font-bold text-green-600">₹{totalRevenue.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</p>
         </div>
       </div>
 
@@ -184,10 +225,11 @@ const BookingsManagement = () => {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Categories</SelectItem>
-                <SelectItem value="schools">Schools</SelectItem>
-                <SelectItem value="colleges">Colleges</SelectItem>
-                <SelectItem value="coaching">Coaching</SelectItem>
-                <SelectItem value="pg-colleges">PG Colleges</SelectItem>
+                {categories?.map((category) => (
+                  <SelectItem key={category.id} value={category.name}>
+                    {category.name}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -233,36 +275,34 @@ const BookingsManagement = () => {
                   <TableCell>
                     <div className="flex items-center gap-1">
                       <Calendar className="h-4 w-4" />
-                      {booking.visit_date} at {booking.visit_time}
+                      {new Date(booking.visit_date).toLocaleDateString('en-IN', {
+                        year: 'numeric',
+                        month: '2-digit',
+                        day: '2-digit'
+                      })} at {booking.visit_time}
                     </div>
                   </TableCell>
-                  <TableCell className="font-medium">₹{booking.amount.toLocaleString()}</TableCell>
+                  <TableCell className="font-medium">₹{formatAmount(booking.amount).toLocaleString('en-IN', { maximumFractionDigits: 2 })}</TableCell>
                   <TableCell>
-                    <Select 
-                      value={booking.status} 
-                      onValueChange={(value) => handleStatusChange(booking.booking_id, value)}
-                    >
-                      <SelectTrigger className="w-32">
-                        <Badge variant={getStatusBadgeVariant(booking.status)}>
-                          {booking.status}
-                        </Badge>
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="confirmed">Confirmed</SelectItem>
-                        <SelectItem value="pending">Pending</SelectItem>
-                        <SelectItem value="cancelled">Cancelled</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <Badge variant={getStatusBadgeVariant(booking.status)}>
+                      {booking.status}
+                    </Badge>
                   </TableCell>
                   <TableCell>
                     <div className="flex gap-2">
-                      <Button size="sm" variant="outline">
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        onClick={() => handleViewReceipt(booking)}
+                        title="View Receipt"
+                      >
                         <Eye className="h-4 w-4" />
                       </Button>
                       <Button 
                         size="sm" 
                         variant="outline"
                         onClick={() => handleDownloadReceipt(booking)}
+                        title="Download Receipt"
                       >
                         <Download className="h-4 w-4" />
                       </Button>

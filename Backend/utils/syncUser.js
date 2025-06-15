@@ -6,20 +6,21 @@ const { cognitoClient, userPoolId } = require('../config/cognito');
  * Syncs user data from Cognito to RDS database
  * @param {string} cognitoId - The Cognito sub (unique identifier)
  * @param {string} email - User's email
+ * @param {string} googleId - User's Google ID (optional)
  * @returns {Promise<Object>} The synced user data
  */
-const syncUserToRDS = async (cognitoId, email) => {
+const syncUserToRDS = async (cognitoId, email, googleId = null) => {
     if (!cognitoId || !email) {
         throw new Error('cognitoId and email are required');
     }
 
     try {
-        console.log('Starting user sync to RDS:', { cognitoId, email });
+        console.log('Starting user sync to RDS:', { cognitoId, email, googleId });
 
-        // Get user details from Cognito
+        // Get user details from Cognito using the username (cognitoId)
         const command = new AdminGetUserCommand({
             UserPoolId: userPoolId,
-            Username: email
+            Username: cognitoId
         });
         const cognitoUser = await cognitoClient.send(command);
 
@@ -27,37 +28,35 @@ const syncUserToRDS = async (cognitoId, email) => {
         const fullName = cognitoUser.UserAttributes.find(attr => attr.Name === 'name')?.Value || '';
         const phone = cognitoUser.UserAttributes.find(attr => attr.Name === 'phone_number')?.Value || null;
         const picture = cognitoUser.UserAttributes.find(attr => attr.Name === 'picture')?.Value || null;
-        const googleId = cognitoUser.UserAttributes.find(attr => attr.Name === 'identities')?.Value || null;
 
         console.log('Retrieved Cognito user attributes:', { fullName, phone, picture, googleId });
 
-        // Check if user exists in RDS
+        // Check if user exists in RDS using cognito_id (which is the Cognito username)
         const existingUser = await query(
-            'SELECT * FROM users WHERE cognito_id = $1 OR email = $2',
-            [cognitoId, email]
+            'SELECT * FROM users WHERE cognito_id = $1',
+            [cognitoId]
         );
 
         let result;
         if (existingUser.rows.length > 0) {
             console.log('Updating existing user in RDS');
-            // Update existing user - try both cognito_id and email
+            // Update existing user using cognito_id
             result = await query(
                 `UPDATE users 
                 SET 
-                    cognito_id = $1,
-                    email = $2,
-                    full_name = $3,
-                    phone = $4,
-                    profile_picture_url = $5,
-                    google_id = $6,
+                    email = $1,
+                    full_name = $2,
+                    phone = $3,
+                    profile_picture_url = $4,
+                    google_id = $5,
                     updated_at = CURRENT_TIMESTAMP
-                WHERE cognito_id = $1 OR email = $2
+                WHERE cognito_id = $6
                 RETURNING *`,
-                [cognitoId, email, fullName, phone, picture, googleId]
+                [email, fullName, phone, picture, googleId, cognitoId]
             );
         } else {
             console.log('Creating new user in RDS');
-            // Create new user
+            // Create new user with cognito_id as the username
             result = await query(
                 `INSERT INTO users 
                 (cognito_id, email, full_name, phone, profile_picture_url, google_id)

@@ -1,8 +1,38 @@
-
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import axios from "axios";
+
+interface PlatformSettings {
+  contactEmail: string;
+  supportPhone: string;
+}
+
+interface ApiResponse {
+  success: boolean;
+  data: PlatformSettings;
+}
 
 const Footer = () => {
+  const [settings, setSettings] = useState<PlatformSettings>({
+    contactEmail: '',
+    supportPhone: ''
+  });
+
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const response = await axios.get<ApiResponse>('http://localhost:3000/api/settings');
+        if (response.data.success) {
+          setSettings(response.data.data);
+        }
+      } catch (error) {
+        console.error('Error fetching settings:', error);
+      }
+    };
+
+    fetchSettings();
+  }, []);
+
   return (
     <footer className="bg-gray-100 pt-12 pb-8">
       <div className="container">
@@ -39,7 +69,7 @@ const Footer = () => {
               <li>
                 <Link to="/terms" className="text-sm text-gray-600 hover:text-education-600">
                   Terms & Conditions
-              </Link>
+                </Link>
               </li>
               <li>
                 <Link to="/privacy" className="text-sm text-gray-600 hover:text-education-600">
@@ -84,10 +114,10 @@ const Footer = () => {
             <h3 className="font-semibold mb-4">Contact Us</h3>
             <ul className="space-y-2">
               <li className="text-sm text-gray-600">
-                support@guardiann.com
+                {settings.contactEmail || 'support@guardiann.com'}
               </li>
               <li className="text-sm text-gray-600">
-                +91 9063601724
+                {settings.supportPhone || '+91 9063601724'}
               </li>
             </ul>
           </div>

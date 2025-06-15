@@ -1,9 +1,34 @@
-
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
+import axios from "axios";
+
+interface PlatformSettings {
+  siteName: string;
+  siteDescription: string;
+  contactEmail: string;
+  supportPhone: string;
+  address: {
+    street: string;
+    city: string;
+    state: string;
+    country: string;
+    pincode: string;
+  };
+  socialMedia: {
+    facebook: string;
+    twitter: string;
+    instagram: string;
+    linkedin: string;
+  };
+}
+
+interface ApiResponse {
+  success: boolean;
+  data: PlatformSettings;
+}
 
 const Contact = () => {
   const [formData, setFormData] = useState({
@@ -12,6 +37,43 @@ const Contact = () => {
     subject: "",
     message: "",
   });
+
+  const [settings, setSettings] = useState<PlatformSettings>({
+    siteName: "Guardiann",
+    siteDescription: "Your trusted education platform",
+    contactEmail: "support@guardiann.com",
+    supportPhone: "+91 9063601724",
+    address: {
+      street: "Himagiri Block",
+      city: "Vizianagaram",
+      state: "AP",
+      country: "India",
+      pincode: "535002"
+    },
+    socialMedia: {
+      facebook: "",
+      twitter: "",
+      instagram: "",
+      linkedin: ""
+    }
+  });
+
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const response = await axios.get<ApiResponse>('http://localhost:3000/api/settings');
+        console.log('Settings response:', response.data);
+        if (response.data.success && response.data.data) {
+          setSettings(response.data.data);
+        }
+      } catch (error) {
+        console.error('Error fetching settings:', error);
+        toast.error('Failed to load platform settings');
+      }
+    };
+
+    fetchSettings();
+  }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -71,7 +133,9 @@ const Contact = () => {
                   </div>
                   <div>
                     <h3 className="font-medium">Email</h3>
-                    <p className="text-gray-600">support  @guardiann.com</p>
+                    <a href={`mailto:${settings.contactEmail}`} className="text-education-600 hover:text-education-700">
+                      {settings.contactEmail}
+                    </a>
                   </div>
                 </div>
                 
@@ -83,7 +147,9 @@ const Contact = () => {
                   </div>
                   <div>
                     <h3 className="font-medium">Phone</h3>
-                    <p className="text-gray-600">+91 9063601724</p>
+                    <a href={`tel:${settings.supportPhone}`} className="text-education-600 hover:text-education-700">
+                      {settings.supportPhone}
+                    </a>
                   </div>
                 </div>
                 
@@ -97,9 +163,20 @@ const Contact = () => {
                   <div>
                     <h3 className="font-medium">Address</h3>
                     <p className="text-gray-600">
-                      Himagiri Block<br />
-                      Vizianagaram, AP 535002<br />
-                      India.
+                      {settings.address.street && (
+                        <span className="block">{settings.address.street}</span>
+                      )}
+                      {settings.address.city && settings.address.state && (
+                        <span className="block">
+                          {settings.address.city}, {settings.address.state}
+                        </span>
+                      )}
+                      {settings.address.pincode && (
+                        <span className="block">{settings.address.pincode}</span>
+                      )}
+                      {settings.address.country && (
+                        <span className="block">{settings.address.country}</span>
+                      )}
                     </p>
                   </div>
                 </div>
@@ -109,30 +186,62 @@ const Contact = () => {
                 <h3 className="font-medium mb-4">Connect With Us</h3>
                 <div className="flex space-x-4">
                   {/* Social Media Icons */}
-                  <a href="#" className="bg-gray-100 hover:bg-education-100 p-2 rounded-full transition-colors">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-education-600">
-                      <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"></path>
-                    </svg>
-                  </a>
-                  <a href="#" className="bg-gray-100 hover:bg-education-100 p-2 rounded-full transition-colors">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-education-600">
-                      <rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect>
-                      <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path>
-                      <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line>
-                    </svg>
-                  </a>
-                  <a href="#" className="bg-gray-100 hover:bg-education-100 p-2 rounded-full transition-colors">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-education-600">
-                      <path d="M22 4s-.7 2.1-2 3.4c1.6 10-9.4 17.3-18 11.6 2.2.1 4.4-.6 6-2C3 15.5.5 9.6 3 5c2.2 2.6 5.6 4.1 9 4-.9-4.2 4-6.6 7-3.8 1.1 0 3-1.2 3-1.2z"></path>
-                    </svg>
-                  </a>
-                  <a href="#" className="bg-gray-100 hover:bg-education-100 p-2 rounded-full transition-colors">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-education-600">
-                      <path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"></path>
-                      <rect x="2" y="9" width="4" height="12"></rect>
-                      <circle cx="4" cy="4" r="2"></circle>
-                    </svg>
-                  </a>
+                  {settings.socialMedia.facebook && (
+                    <a 
+                      href={settings.socialMedia.facebook} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="bg-gray-100 hover:bg-education-100 p-2 rounded-full transition-colors"
+                      title="Facebook"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-education-600">
+                        <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"></path>
+                      </svg>
+                    </a>
+                  )}
+                  {settings.socialMedia.instagram && (
+                    <a 
+                      href={settings.socialMedia.instagram} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="bg-gray-100 hover:bg-education-100 p-2 rounded-full transition-colors"
+                      title="Instagram"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-education-600">
+                        <rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect>
+                        <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path>
+                        <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line>
+                      </svg>
+                    </a>
+                  )}
+                  {settings.socialMedia.twitter && (
+                    <a 
+                      href={settings.socialMedia.twitter} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="bg-gray-100 hover:bg-education-100 p-2 rounded-full transition-colors"
+                      title="Twitter"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-education-600">
+                        <path d="M22 4s-.7 2.1-2 3.4c1.6 10-9.4 17.3-18 11.6 2.2.1 4.4-.6 6-2C3 15.5.5 9.6 3 5c2.2 2.6 5.6 4.1 9 4-.9-4.2 4-6.6 7-3.8 1.1 0 3-1.2 3-1.2z"></path>
+                      </svg>
+                    </a>
+                  )}
+                  {settings.socialMedia.linkedin && (
+                    <a 
+                      href={settings.socialMedia.linkedin} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="bg-gray-100 hover:bg-education-100 p-2 rounded-full transition-colors"
+                      title="LinkedIn"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-education-600">
+                        <path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"></path>
+                        <rect x="2" y="9" width="4" height="12"></rect>
+                        <circle cx="4" cy="4" r="2"></circle>
+                      </svg>
+                    </a>
+                  )}
                 </div>
               </div>
             </motion.div>

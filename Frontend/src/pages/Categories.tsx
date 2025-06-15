@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
-import { School, Book, Users, Calendar } from "lucide-react";
+import { School } from "lucide-react";
 import axios from "axios";
 
 interface Category {
@@ -12,6 +12,7 @@ interface Category {
   description: string;
   subcategories: string[];
   display_order: number;
+  icon_url: string | null;
 }
 
 interface ApiResponse {
@@ -25,6 +26,7 @@ const Categories = () => {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [failedIcons, setFailedIcons] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     const fetchCategories = async () => {
@@ -45,14 +47,6 @@ const Categories = () => {
 
     fetchCategories();
   }, []);
-
-  // Map of category names to their respective icons
-  const categoryIcons: { [key: string]: JSX.Element } = {
-    'Schools': <School className="h-10 w-10" />,
-    'Colleges': <Book className="h-10 w-10" />,
-    'Coaching Centers': <Users className="h-10 w-10" />,
-    'PG Colleges': <Calendar className="h-10 w-10" />,
-  };
 
   // Map of category names to their respective colors
   const categoryColors: { [key: string]: string } = {
@@ -88,7 +82,20 @@ const Categories = () => {
               <div key={category.id} className="bg-white rounded-xl shadow-md overflow-hidden">
                 <div className="md:flex">
                   <div className="md:flex-shrink-0 flex items-center justify-center p-8 md:w-64">
-                    <div className={`p-6 rounded-full ${categoryColors[category.name] || 'bg-gray-100'}`}>{categoryIcons[category.name] || <div className="h-10 w-10" />}</div>
+                    <div className={`p-6 rounded-full ${categoryColors[category.name] || 'bg-gray-100'}`}>
+                      {category.icon_url && !failedIcons.has(category.id) ? (
+                        <img 
+                          src={category.icon_url} 
+                          alt={category.name} 
+                          className="h-10 w-10 object-contain"
+                          onError={() => {
+                            setFailedIcons(prev => new Set([...prev, category.id]));
+                          }}
+                        />
+                      ) : (
+                        <School className="h-10 w-10" />
+                      )}
+                    </div>
                   </div>
                   <div className="p-8 md:flex-1">
                     <h2 className="text-2xl font-bold mb-3">{category.name}</h2>
