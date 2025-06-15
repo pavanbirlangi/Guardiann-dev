@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -10,7 +10,13 @@ const Navbar = () => {
   const isMobile = useIsMobile();
   const [menuOpen, setMenuOpen] = React.useState(false);
   const navigate = useNavigate();
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated, user, loading } = useAuth();
+  const [forceUpdate, setForceUpdate] = React.useState(0);
+
+  // Force re-render when auth state changes
+  useEffect(() => {
+    setForceUpdate(prev => prev + 1);
+  }, [isAuthenticated, user]);
 
   const toggleMenu = () => {
     setMenuOpen(!menuOpen);
@@ -21,12 +27,28 @@ const Navbar = () => {
     if (menuOpen) setMenuOpen(false);
   };
 
+  // If still loading auth state, show a minimal navbar
+  if (loading) {
+    return (
+      <header className="sticky top-0 z-50 bg-white shadow-sm">
+        <div className="container flex items-center justify-between h-16">
+          <Link to="/" className="flex items-center space-x-2">
+            <span className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-education-600 to-education-400">
+              Guardiann
+            </span>
+          </Link>
+        </div>
+      </header>
+    );
+  }
+
   return (
     <motion.header 
       className="sticky top-0 z-50 bg-white shadow-sm"
       initial={{ y: -100 }}
       animate={{ y: 0 }}
       transition={{ duration: 0.5 }}
+      key={forceUpdate} // Force re-render when auth state changes
     >
       <div className="container flex items-center justify-between h-16">
         {/* Logo */}

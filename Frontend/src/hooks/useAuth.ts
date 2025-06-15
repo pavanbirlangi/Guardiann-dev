@@ -10,6 +10,17 @@ interface AuthState {
   pendingNavigation?: string;
 }
 
+interface AuthResponse {
+  success: boolean;
+  message?: string;
+  tokens?: {
+    accessToken: string;
+    refreshToken: string;
+    idToken: string;
+  };
+  user?: any;
+}
+
 interface LoginCredentials {
   email: string;
   password: string;
@@ -19,19 +30,6 @@ interface RegisterCredentials {
   fullName: string;
   email: string;
   password: string;
-}
-
-interface AuthResponse {
-  tokens: {
-    accessToken: string;
-    refreshToken: string;
-    idToken: string;
-  };
-  user: {
-    email: string;
-    role: string;
-    name: string;
-  };
 }
 
 export const useAuth = () => {
@@ -204,31 +202,50 @@ export const useAuth = () => {
       setLoading(true);
       const accessToken = localStorage.getItem('accessToken');
       
-      if (accessToken) {
-        await axiosInstance.post('/auth/logout', { accessToken });
-      }
-
-      // Clear all auth data
+      // Clear all auth data first
       localStorage.removeItem('accessToken');
       localStorage.removeItem('refreshToken');
       localStorage.removeItem('idToken');
       localStorage.removeItem('user');
       
+      // Update auth state immediately
       setAuthState({
         isAuthenticated: false,
         user: null,
         loading: false,
       });
 
+      // Then try to logout from server
+      if (accessToken) {
+        try {
+          await axiosInstance.post('/auth/logout', { accessToken });
+        } catch (error) {
+          console.error('Server logout error:', error);
+          // Continue with local logout even if server logout fails
+        }
+      }
+
       toast({
         title: 'Logged Out',
         description: 'You have been logged out successfully.',
       });
 
-      navigate('/');
+      // Navigate after state is cleared
+      navigate('/', { replace: true });
     } catch (error) {
       console.error('Logout error:', error);
       handleError(error);
+      // Even if everything fails, try to clear storage and redirect
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('refreshToken');
+      localStorage.removeItem('idToken');
+      localStorage.removeItem('user');
+      setAuthState({
+        isAuthenticated: false,
+        user: null,
+        loading: false,
+      });
+      navigate('/', { replace: true });
     } finally {
       setLoading(false);
     }
@@ -252,7 +269,6 @@ export const useAuth = () => {
     }
   }, []);
 
-  // Handle Google OAuth callback
   const handleGoogleCallback = useCallback(async (authData: any) => {
     try {
       console.log('Handling Google callback with auth data:', authData);
