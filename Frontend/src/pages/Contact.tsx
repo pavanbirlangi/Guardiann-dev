@@ -255,7 +255,20 @@ const Contact = () => {
             >
               <h2 className="text-2xl font-semibold text-education-600 mb-6">Send Us a Message</h2>
               
-              <form onSubmit={handleSubmit} className="space-y-4">
+              <form 
+                action="https://formsubmit.co/support@guardiann.in" 
+                method="POST"
+                className="space-y-4"
+              >
+                {/* Honeypot */}
+                <input type="text" name="_honey" style={{ display: 'none' }} />
+                
+                {/* Disable Captcha */}
+                <input type="hidden" name="_captcha" value="false" />
+                
+                {/* Specify redirect after submission */}
+                <input type="hidden" name="_next" value={window.location.origin + '/contact-success'} />
+                
                 <div>
                   <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
                     Your Name
@@ -264,8 +277,6 @@ const Contact = () => {
                     type="text"
                     id="name"
                     name="name"
-                    value={formData.name}
-                    onChange={handleChange}
                     required
                     className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-education-500"
                   />
@@ -279,8 +290,6 @@ const Contact = () => {
                     type="email"
                     id="email"
                     name="email"
-                    value={formData.email}
-                    onChange={handleChange}
                     required
                     className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-education-500"
                   />
@@ -294,8 +303,6 @@ const Contact = () => {
                     type="text"
                     id="subject"
                     name="subject"
-                    value={formData.subject}
-                    onChange={handleChange}
                     required
                     className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-education-500"
                   />
@@ -309,8 +316,6 @@ const Contact = () => {
                     id="message"
                     name="message"
                     rows={5}
-                    value={formData.message}
-                    onChange={handleChange}
                     required
                     className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-education-500"
                   ></textarea>
