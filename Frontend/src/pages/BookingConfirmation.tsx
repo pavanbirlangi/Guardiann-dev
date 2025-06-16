@@ -7,6 +7,13 @@ import { Calendar, Clock, MapPin, Phone, Download, ArrowLeft, Check, AlertCircle
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import Layout from '@/components/Layout';
+import { generateGoogleCalendarUrl, generateOutlookCalendarUrl } from '@/utils/calendar';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface BookingData {
   booking_id: string;
@@ -32,6 +39,7 @@ interface BookingData {
   visitor_email: string;
   visitor_phone: string;
   pdf_url?: string;
+  notes?: string;
 }
 
 const BookingConfirmation = () => {
@@ -226,6 +234,32 @@ const BookingConfirmation = () => {
     }
   };
 
+  const handleAddToCalendar = (calendarType: 'google' | 'outlook') => {
+    if (!booking) return;
+
+    const visitDate = new Date(booking.visit_date);
+    const [hours, minutes] = booking.visit_time.split(':').map(Number);
+    visitDate.setHours(hours, minutes);
+
+    // Set end time to 1 hour after start time
+    const endDate = new Date(visitDate);
+    endDate.setHours(endDate.getHours() + 1);
+
+    const event = {
+      title: `Visit to ${booking.institution_name}`,
+      description: `Booking ID: ${booking.booking_id}\n\nPurpose: ${booking.notes || 'Institution Visit'}\n\nContact: ${booking.institution_contact?.phone || 'N/A'}`,
+      startTime: visitDate.toISOString(),
+      endTime: endDate.toISOString(),
+      location: booking.institution_address
+    };
+
+    const url = calendarType === 'google' 
+      ? generateGoogleCalendarUrl(event)
+      : generateOutlookCalendarUrl(event);
+
+    window.open(url, '_blank');
+  };
+
   if (loading) {
     return (
       <Layout>
@@ -365,10 +399,22 @@ const BookingConfirmation = () => {
                         <Download className="h-4 w-4" />
                         Download Receipt
                       </Button>
-                      <Button className="flex items-center gap-2" variant="outline">
-                        <Calendar className="h-4 w-4" />
-                        Add to Calendar
-                      </Button>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button className="flex items-center gap-2" variant="outline">
+                            <Calendar className="h-4 w-4" />
+                            Add to Calendar
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent>
+                          <DropdownMenuItem onClick={() => handleAddToCalendar('google')}>
+                            Add to Google Calendar
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleAddToCalendar('outlook')}>
+                            Add to Outlook Calendar
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </>
                   )}
                   {booking.status === 'pending' && (
@@ -382,7 +428,7 @@ const BookingConfirmation = () => {
               {/* Footer */}
               <div className="border-t p-6">
                 <p className="text-center text-gray-600 text-sm mb-4">
-                  Thank you for choosing SchoolSeeker Connect.
+                  Thank you for choosing Guardiann.
                 </p>
                 <div className="text-center">
                   <Button variant="link" onClick={() => navigate('/')}>

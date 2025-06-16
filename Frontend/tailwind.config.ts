@@ -63,7 +63,7 @@ export default {
 					border: 'hsl(var(--sidebar-border))',
 					ring: 'hsl(var(--sidebar-ring))'
 				},
-				// Custom colors for SchoolSeeker
+				// Custom colors for Guardiann
 				education: {
 					50: '#f0f9ff',
 					100: '#e0f2fe',
