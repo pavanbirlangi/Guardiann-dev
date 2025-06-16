@@ -277,6 +277,9 @@ const updateUserData = async (req, res) => {
 const getUserBookings = async (req, res) => {
     try {
         const { username } = req.user;
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
+        const offset = (page - 1) * limit;
 
         // Get user id from users table
         const userResult = await db.query(
@@ -287,6 +290,13 @@ const getUserBookings = async (req, res) => {
             return res.status(404).json({ success: false, message: 'User not found' });
         }
         const user_id = userResult.rows[0].id;
+
+        // Get total count of bookings
+        const countResult = await db.query(
+            'SELECT COUNT(*) FROM bookings WHERE user_id = $1',
+            [user_id]
+        );
+        const totalBookings = parseInt(countResult.rows[0].count);
 
         // Get bookings with institution details
         const result = await db.query(
@@ -300,8 +310,9 @@ const getUserBookings = async (req, res) => {
             LEFT JOIN institutions i ON b.institution_id = i.id
             LEFT JOIN categories c ON i.category_id = c.id
             WHERE b.user_id = $1
-            ORDER BY b.created_at DESC`,
-            [user_id]
+            ORDER BY b.created_at DESC
+            LIMIT $2 OFFSET $3`,
+            [user_id, limit, offset]
         );
 
         // Transform the data to ensure all fields are properly formatted
@@ -314,7 +325,13 @@ const getUserBookings = async (req, res) => {
 
         res.json({
             success: true,
-            data: bookings
+            data: bookings,
+            pagination: {
+                total: totalBookings,
+                page,
+                limit,
+                totalPages: Math.ceil(totalBookings / limit)
+            }
         });
     } catch (error) {
         console.error('Error fetching user bookings:', error);

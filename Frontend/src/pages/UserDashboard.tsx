@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Form, FormField, FormItem, FormLabel, FormControl, FormDescription, FormMessage } from "@/components/ui/form";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, Check, Download, User } from "lucide-react";
+import { Calendar, Check, Download, User, ChevronLeft, ChevronRight } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import axios from "axios";
 import { toast } from "sonner";
@@ -49,6 +49,14 @@ interface ApiResponse<T> {
   success: boolean;
   message: string;
   data: T;
+  pagination: PaginationInfo;
+}
+
+interface PaginationInfo {
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
 }
 
 const DEFAULT_THUMBNAIL = 'https://placehold.co/96x96?text=No+Image';
@@ -63,11 +71,18 @@ const UserDashboard = () => {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [bookingsLoading, setBookingsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [paginationInfo, setPaginationInfo] = useState<PaginationInfo>({
+    total: 0,
+    page: 1,
+    limit: 10,
+    totalPages: 0
+  });
   
   useEffect(() => {
     fetchUserProfile();
-    fetchUserBookings();
-  }, []);
+    fetchUserBookings(currentPage);
+  }, [currentPage]);
 
   const fetchUserProfile = async () => {
     setIsLoading(true);
@@ -90,16 +105,22 @@ const UserDashboard = () => {
     }
   };
 
-  const fetchUserBookings = async () => {
+  const fetchUserBookings = async (page: number) => {
     setBookingsLoading(true);
     try {
       const token = localStorage.getItem('accessToken');
       const response = await axios.get<ApiResponse<Booking[]>>(
-        `${import.meta.env.VITE_API_URL}/dashboard/user/bookings`,
+        `${import.meta.env.VITE_API_URL}/dashboard/user/bookings?page=${page}&limit=10`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       if (response.data.success) {
         setBookings(response.data.data);
+        setPaginationInfo(response.data.pagination);
+        // Scroll to top after data is loaded
+        window.scrollTo({
+          top: 0,
+          behavior: 'smooth'
+        });
       }
     } catch (error) {
       console.error('Error fetching bookings:', error);
@@ -155,6 +176,12 @@ const UserDashboard = () => {
       return <Badge variant="outline" className="text-yellow-600 border-yellow-600">Pending</Badge>;
     } else {
       return <Badge variant="secondary">Unknown</Badge>;
+    }
+  };
+
+  const handlePageChange = (newPage: number) => {
+    if (newPage >= 1 && newPage <= paginationInfo.totalPages) {
+      setCurrentPage(newPage);
     }
   };
 
@@ -324,6 +351,36 @@ const UserDashboard = () => {
                                 </div>
                               </div>
                             ))}
+                            
+                            {/* Pagination Controls */}
+                            <div className="flex items-center justify-between mt-6">
+                              <div className="text-sm text-gray-600">
+                                Showing {((currentPage - 1) * paginationInfo.limit) + 1} to {Math.min(currentPage * paginationInfo.limit, paginationInfo.total)} of {paginationInfo.total} bookings
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handlePageChange(currentPage - 1)}
+                                  disabled={currentPage === 1}
+                                >
+                                  <ChevronLeft className="h-4 w-4" />
+                                  Previous
+                                </Button>
+                                <div className="text-sm">
+                                  Page {currentPage} of {paginationInfo.totalPages}
+                                </div>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handlePageChange(currentPage + 1)}
+                                  disabled={currentPage === paginationInfo.totalPages}
+                                >
+                                  Next
+                                  <ChevronRight className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </div>
                           </div>
                         ) : (
                           <div className="text-center py-8">

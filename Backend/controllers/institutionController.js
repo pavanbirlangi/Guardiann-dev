@@ -752,83 +752,70 @@ const deleteInstitution = async (req, res) => {
 const getInstitutionsByCategory = async (req, res) => {
     try {
         const { category } = req.params;
-        const { city, type } = req.query;
+        const { city, type, page = 1, limit = 12 } = req.query;
+        const offset = (page - 1) * limit;
 
-        console.log('Fetching institutions for category:', category);
-        console.log('Query parameters:', { city, type });
+        // Get total count
+        let countQuery = `
+            SELECT COUNT(*)
+            FROM institutions i
+            JOIN categories c ON i.category_id = c.id
+            WHERE c.slug = $1
+        `;
+        const countParams = [category];
 
-        // First, get the category ID from the slug
-        const categoryResult = await pool.query(
-            'SELECT id FROM categories WHERE slug = $1',
-            [category]
-        );
-
-        console.log('Category query result:', categoryResult.rows);
-
-        if (categoryResult.rows.length === 0) {
-            console.log('Category not found:', category);
-            return res.status(404).json({
-                success: false,
-                message: 'Category not found'
-            });
+        if (city) {
+            countQuery += ` AND i.city = $${countParams.length + 1}`;
+            countParams.push(city);
         }
 
-        const categoryId = categoryResult.rows[0].id;
-        console.log('Found category ID:', categoryId);
+        if (type) {
+            countQuery += ` AND i.type = $${countParams.length + 1}`;
+            countParams.push(type);
+        }
 
+        const countResult = await pool.query(countQuery, countParams);
+        const totalInstitutions = parseInt(countResult.rows[0].count);
+
+        // Get paginated institutions
         let query = `
             SELECT i.*, c.name as category_name
             FROM institutions i
             JOIN categories c ON i.category_id = c.id
-            WHERE i.category_id = $1
+            WHERE c.slug = $1
         `;
-        const params = [categoryId];
-        let paramCount = 2;
+        const params = [category];
 
         if (city) {
-            query += ` AND i.city ILIKE $${paramCount}`;
-            params.push(`%${city}%`);
-            paramCount++;
+            query += ` AND i.city = $${params.length + 1}`;
+            params.push(city);
         }
 
         if (type) {
-            query += ` AND i.type ILIKE $${paramCount}`;
-            params.push(`%${type}%`);
-            paramCount++;
+            query += ` AND i.type = $${params.length + 1}`;
+            params.push(type);
         }
 
-        query += ` ORDER BY i.name`;
-
-        console.log('Executing query:', query);
-        console.log('Query parameters:', params);
+        query += ` ORDER BY i.name LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
+        params.push(limit, offset);
 
         const result = await pool.query(query, params);
-        
-        console.log('Query result:', result.rows);
-
-        if (result.rows.length === 0) {
-            console.log('No institutions found for category:', category);
-            return res.status(404).json({
-                success: false,
-                message: 'No institutions found for this category'
-            });
-        }
 
         res.json({
             success: true,
-            data: result.rows
+            data: result.rows,
+            pagination: {
+                total: totalInstitutions,
+                page: parseInt(page),
+                limit: parseInt(limit),
+                totalPages: Math.ceil(totalInstitutions / limit)
+            }
         });
     } catch (error) {
-        console.error('Error fetching institutions by category:', error);
-        console.error('Error details:', {
-            message: error.message,
-            stack: error.stack,
-            code: error.code
-        });
+        console.error('Error fetching institutions:', error);
         res.status(500).json({
             success: false,
-            message: 'Failed to fetch institutions',
-            error: process.env.NODE_ENV === 'development' ? error.message : undefined
+            message: 'Failed to fetch institutions'
         });
     }
 };

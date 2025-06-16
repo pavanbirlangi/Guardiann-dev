@@ -24,6 +24,10 @@ const InstitutionListing = () => {
   const [categoryData, setCategoryData] = useState<Category | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [filteredInstitutions, setFilteredInstitutions] = useState<any[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalInstitutions, setTotalInstitutions] = useState(0);
+  const institutionsPerPage = 12;
 
   useEffect(() => {
     const fetchCategory = async () => {
@@ -48,33 +52,42 @@ const InstitutionListing = () => {
     }
   }, [category]);
 
-  useEffect(() => {
-    const fetchInstitutions = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        const response = await axios.get<{ success: boolean; data: any[]; message?: string }>(
-          `${import.meta.env.VITE_API_URL}/institutions/list/${category}`
-        );
-        
-        if (response.data.success) {
-          setInstitutions(response.data.data || []);
-          setFilteredInstitutions(response.data.data || []);
-        } else {
-          throw new Error(response.data.message || 'Failed to fetch institutions');
-        }
-      } catch (err: any) {
-        setError(err.response?.data?.message || err.message || 'Failed to fetch institutions');
-        toast.error('Failed to fetch institutions');
-      } finally {
-        setLoading(false);
-      }
-    };
+  const fetchInstitutions = async (page = 1) => {
+    try {
+      setLoading(true);
+      const queryParams = new URLSearchParams({
+        page: page.toString(),
+        limit: institutionsPerPage.toString(),
+        ...(cityFilter && { city: cityFilter }),
+        ...(typeFilter && { type: typeFilter })
+      });
 
-    if (category) {
-      fetchInstitutions();
+      const response = await axios.get<{
+        success: boolean;
+        data: any[];
+        pagination: { totalPages: number; total: number };
+        message?: string;
+      }>(`${import.meta.env.VITE_API_URL}/institutions/list/${category}?${queryParams}`);
+      
+      if (response.data.success) {
+        setInstitutions(response.data.data || []);
+        setFilteredInstitutions(response.data.data || []);
+        setTotalPages(response.data.pagination.totalPages);
+        setTotalInstitutions(response.data.pagination.total);
+        setCurrentPage(page);
+      } else {
+        throw new Error(response.data.message || 'Failed to fetch institutions');
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch institutions');
+    } finally {
+      setLoading(false);
     }
-  }, [category]);
+  };
+
+  useEffect(() => {
+    fetchInstitutions(1);
+  }, [category, cityFilter, typeFilter]);
 
   // Apply search and filters
   useEffect(() => {
@@ -146,6 +159,18 @@ const InstitutionListing = () => {
     setTypeFilter(null);
     setSearchQuery("");
     setFeeRangeFilter(null);
+    setCurrentPage(1);
+  };
+
+  const handleFilterChange = (newFilters) => {
+    setCityFilter(newFilters.city);
+    setTypeFilter(newFilters.type);
+    setCurrentPage(1);
+  };
+
+  const handlePageChange = (newPage) => {
+    fetchInstitutions(newPage);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   if (loading) {
@@ -353,6 +378,36 @@ const InstitutionListing = () => {
               <p className="text-2xl font-semibold mb-2">No results found</p>
               <p className="text-gray-600 mb-6">Try adjusting your filters or search term</p>
               <Button onClick={clearFilters}>Clear Filters</Button>
+            </div>
+          )}
+
+          {totalPages > 1 && (
+            <div className="mt-8 flex justify-center items-center gap-4">
+              <button
+                onClick={() => handlePageChange(currentPage - 1)}
+                disabled={currentPage === 1}
+                className={`px-4 py-2 rounded-md ${
+                  currentPage === 1
+                    ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                    : 'bg-primary text-white hover:bg-primary-dark'
+                }`}
+              >
+                Previous
+              </button>
+              <span className="text-gray-600">
+                Page {currentPage} of {totalPages}
+              </span>
+              <button
+                onClick={() => handlePageChange(currentPage + 1)}
+                disabled={currentPage === totalPages}
+                className={`px-4 py-2 rounded-md ${
+                  currentPage === totalPages
+                    ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                    : 'bg-primary text-white hover:bg-primary-dark'
+                }`}
+              >
+                Next
+              </button>
             </div>
           )}
         </div>
