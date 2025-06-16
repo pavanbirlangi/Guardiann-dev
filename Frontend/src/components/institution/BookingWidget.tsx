@@ -58,7 +58,7 @@ const BookingWidget: React.FC<BookingWidgetProps> = ({ institution, category, id
         </div>
         <div className="flex items-center">
           <Check className="w-5 h-5 text-green-500 mr-2" />
-          <span className="text-sm">Personalized campus tour</span>
+          <span className="text-sm">Detailed course & fee breakdown</span>
         </div>
         <div className="flex items-center">
           <Check className="w-5 h-5 text-green-500 mr-2" />

@@ -1176,7 +1176,10 @@ const verifyPayment = async (req, res) => {
         const booking = bookingResult.rows[0];
 
         // Generate PDF
-        const doc = new PDFDocument({ margin: 50 });
+        const doc = new PDFDocument({
+            size: 'A4',
+            margin: 50
+        });
         const chunks = [];
 
         doc.on('data', chunk => chunks.push(chunk));
@@ -1259,86 +1262,136 @@ const verifyPayment = async (req, res) => {
         });
 
         // Colors and styles
-        const headingColor = '#0a5275';
-        const lineSpacing = 10;
-        const sectionSpacing = 20;
+        const primaryColor = '#0a5275';
+        const secondaryColor = '#1a73e8';
+        const accentColor = '#34a853';
+        const textColor = '#333333';
+        const lightGray = '#f5f5f5';
+        const borderColor = '#e0e0e0';
+        const sectionSpacing = 30;
+        let y = doc.y;
+
+        // Header
+        doc.fillColor(primaryColor)
+          .fontSize(24)
+          .text('Guardiann', { align: 'center' })
+          .fontSize(16)
+          .text('Booking Confirmation', { align: 'center' });
         
-        function addSectionTitle(title) {
-            doc
-                .fillColor(headingColor)
-                .fontSize(14)
-                .text(title, { underline: true })
-                .moveDown(0.5)
-                .fillColor('black');
-        }
+        y = doc.y + 10;
         
-        // Title
-        doc
-            .fontSize(22)
-            .fillColor('#333333')
-            .text('📄 Booking Confirmation', { align: 'center' })
-            .moveDown(1.5);
+        // Status Badge
+        const statusWidth = 100;
+        const statusHeight = 25;
+        const statusX = (doc.page.width - statusWidth) / 2;
+        
+        doc.roundedRect(statusX, y, statusWidth, statusHeight, 5)
+          .fillAndStroke(accentColor, accentColor);
+        doc.fillColor('white')
+          .fontSize(12)
+          .text('CONFIRMED', statusX, y + 8, {
+            width: statusWidth,
+            align: 'center'
+          });
+        
+        y += statusHeight + sectionSpacing;
+        
+        // Booking ID
+        doc.fillColor(lightGray)
+          .roundedRect(doc.page.margins.left, y, doc.page.width - doc.page.margins.left - doc.page.margins.right, 45, 5)
+          .fill();
+        doc.fillColor(textColor)
+          .fontSize(10)
+          .text('Booking ID', doc.page.margins.left + 20, y + 10)
+          .fontSize(14)
+          .font('Helvetica-Bold')
+          .text(booking.booking_id, doc.page.margins.left + 20, y + 25);
+        
+        y += 60;
         
         // Institution Details
-        addSectionTitle('🏢 Institution Details');
-        doc
-            .fontSize(12)
-            .text(`Name: `, { continued: true }).font('Helvetica-Bold').text(booking.institution_name)
-            .font('Helvetica').text(`Address: `, { continued: true }).font('Helvetica-Bold').text(booking.institution_address)
-            .font('Helvetica').text(`City: `, { continued: true }).font('Helvetica-Bold').text(booking.institution_city)
-            .font('Helvetica').text(`State: `, { continued: true }).font('Helvetica-Bold').text(booking.institution_state)
-            .moveDown();
+        doc.fillColor(primaryColor)
+          .fontSize(14)
+          .text('Institution Details', doc.page.margins.left, y, { underline: true });
         
-        // Booking Details
-        addSectionTitle('📆 Booking Details');
-        doc
-            .fontSize(12)
-            .font('Helvetica').text(`Booking ID: `, { continued: true }).font('Helvetica-Bold').text(booking.booking_id)
-            .font('Helvetica').text(`Visit Date: `, { continued: true }).font('Helvetica-Bold').text(new Date(booking.visit_date).toLocaleDateString())
-            .font('Helvetica').text(`Visit Time: `, { continued: true }).font('Helvetica-Bold').text(booking.visit_time)
-            .font('Helvetica').text(`Amount: `, { continued: true }).font('Helvetica-Bold').text(`₹${booking.amount}`)
-            .font('Helvetica').text(`Status: `, { continued: true }).font('Helvetica-Bold').text(`Confirmed`)
-            .font('Helvetica').text(`Payment ID: `, { continued: true }).font('Helvetica-Bold').text(razorpay_payment_id)
-            .moveDown();
+        y = doc.y + 10;
+        doc.fillColor(lightGray)
+          .roundedRect(doc.page.margins.left, y, doc.page.width - doc.page.margins.left - doc.page.margins.right, 70, 5)
+          .fill();
+        doc.fillColor(textColor)
+          .fontSize(12)
+          .text('Name: ' + booking.institution_name, doc.page.margins.left + 20, y + 10)
+          .text('Address: ' + booking.institution_address, doc.page.margins.left + 20, y + 30)
+          .text('City: ' + booking.institution_city + ', ' + booking.institution_state, doc.page.margins.left + 20, y + 50);
+        
+        y += 90;
+        
+        // Visit Details
+        doc.fillColor(primaryColor)
+          .fontSize(14)
+          .text('Visit Details', doc.page.margins.left, y, { underline: true });
+        
+        y = doc.y + 10;
+        doc.fillColor(lightGray)
+          .roundedRect(doc.page.margins.left, y, doc.page.width - doc.page.margins.left - doc.page.margins.right, 90, 5)
+          .fill();
+        doc.fillColor(textColor)
+          .fontSize(12)
+          .text('Visit Date: ' + new Date(booking.visit_date).toLocaleDateString(), doc.page.margins.left + 20, y + 10)
+          .text('Visit Time: ' + booking.visit_time, doc.page.margins.left + 20, y + 30)
+          .text('Amount: Rs.' + booking.amount, doc.page.margins.left + 20, y + 50)
+          .text('Payment ID: ' + razorpay_payment_id, doc.page.margins.left + 20, y + 70);
+        
+        y += 110;
         
         // Visitor Details
-        addSectionTitle('🧍 Visitor Details');
-        doc
-            .fontSize(12)
-            .font('Helvetica').text(`Name: `, { continued: true }).font('Helvetica-Bold').text(booking.visitor_name)
-            .font('Helvetica').text(`Email: `, { continued: true }).font('Helvetica-Bold').text(booking.visitor_email)
-            .font('Helvetica').text(`Phone: `, { continued: true }).font('Helvetica-Bold').text(booking.visitor_phone)
-            .moveDown();
+        doc.fillColor(primaryColor)
+          .fontSize(14)
+          .text('Visitor Details', doc.page.margins.left, y, { underline: true });
         
-        // Additional Information
-        addSectionTitle('ℹ️ Additional Information');
-        doc
-            .fontSize(10)
-            .font('Helvetica')
-            .list([
-                'You will receive a confirmation email with your booking details.',
-                'Our representative will contact you 24 hours before your scheduled visit.',
-                'Please carry your booking ID and a valid ID proof during your visit.'
-            ])
-            .moveDown();
+        y = doc.y + 10;
+        doc.fillColor(lightGray)
+          .roundedRect(doc.page.margins.left, y, doc.page.width - doc.page.margins.left - doc.page.margins.right, 70, 5)
+          .fill();
+        doc.fillColor(textColor)
+          .fontSize(12)
+          .text('Name: ' + booking.visitor_name, doc.page.margins.left + 20, y + 10)
+          .text('Email: ' + booking.visitor_email, doc.page.margins.left + 20, y + 30)
+          .text('Phone: ' + booking.visitor_phone, doc.page.margins.left + 20, y + 50);
         
-        // Divider
-        doc
-            .moveTo(doc.page.margins.left, doc.y)
-            .lineTo(doc.page.width - doc.page.margins.right, doc.y)
-            .strokeColor('#cccccc')
-            .lineWidth(1)
-            .stroke()
-            .moveDown(1);
+        y += 90;
+        
+        // Important Info
+        doc.fillColor(primaryColor)
+          .fontSize(14)
+          .text('Important Information', doc.page.margins.left, y, { underline: true });
+        
+        y = doc.y + 10;
+        doc.fillColor(lightGray)
+          .roundedRect(doc.page.margins.left, y, doc.page.width - doc.page.margins.left - doc.page.margins.right, 70, 5)
+          .fill();
+        doc.fillColor(textColor)
+          .fontSize(10)
+          .text('• You will receive a confirmation email with your booking details.', doc.page.margins.left + 20, y + 10)
+          .text('• Reach the campus at the scheduled time as mentioned in your booking.', doc.page.margins.left + 20, y + 30)
+          .text('• Please carry your booking ID and a valid ID proof during your visit.', doc.page.margins.left + 20, y + 50);
+        
+        y += 100;
+
+        doc.moveDown(3);
         
         // Footer
-        doc
-            .fontSize(10)
-            .fillColor('#555555')
-            .text('Thank you for choosing Guardiann', { align: 'center' })
-            .text('For support, contact: support@guardiann.com', { align: 'center' });
-
+        doc.fillColor(primaryColor)
+          .fontSize(12)
+          .text('Thank you for choosing Guardiann', { align: 'center' })
+          .fontSize(10)
+          .text('For support, contact: support@guardiann.com', { align: 'center' })
+          .moveDown(2)
+          .fontSize(8)
+          .text('This is a computer-generated document. No signature is required.', { align: 'center' });
+        
         doc.end();
+        
     } catch (error) {
         console.error('Error verifying payment:', error);
         res.status(500).json({

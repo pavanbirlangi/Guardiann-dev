@@ -373,7 +373,7 @@ const BookingConfirmation = () => {
                       </li>
                       <li className="flex items-start">
                         <Check className="h-4 w-4 text-green-600 mr-2 mt-1 flex-shrink-0" />
-                        <span>Our representative will contact you 24 hours before your scheduled visit.</span>
+                        <span>Reach the campus at the scheduled time as mentioned in your booking.</span>
                       </li>
                       <li className="flex items-start">
                         <Check className="h-4 w-4 text-green-600 mr-2 mt-1 flex-shrink-0" />
