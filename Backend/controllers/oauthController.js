@@ -20,12 +20,32 @@ const calculateSecretHash = (username) => {
 // Helper function to generate a secure password
 const generateSecurePassword = () => {
     const length = 16;
-    const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+";
-    let password = "";
-    for (let i = 0; i < length; i++) {
-        password += charset.charAt(Math.floor(Math.random() * charset.length));
+    const lowercaseChars = "abcdefghijklmnopqrstuvwxyz";
+    const uppercaseChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    const numberChars = "0123456789";
+    const specialChars = "!@#$%^&*()_+";
+    
+    // Ensure at least one character from each required set
+    let password = [
+        lowercaseChars[Math.floor(Math.random() * lowercaseChars.length)],
+        uppercaseChars[Math.floor(Math.random() * uppercaseChars.length)],
+        numberChars[Math.floor(Math.random() * numberChars.length)],
+        specialChars[Math.floor(Math.random() * specialChars.length)]
+    ];
+    
+    // Fill the rest of the password with random characters from all sets
+    const allChars = lowercaseChars + uppercaseChars + numberChars + specialChars;
+    for (let i = password.length; i < length; i++) {
+        password.push(allChars[Math.floor(Math.random() * allChars.length)]);
     }
-    return password;
+    
+    // Shuffle the password array to ensure random distribution
+    for (let i = password.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [password[i], password[j]] = [password[j], password[i]];
+    }
+    
+    return password.join('');
 };
 
 // Helper function to get user role from Cognito
@@ -83,6 +103,8 @@ const handleGoogleCallback = async (req, res) => {
 
         const userInfo = await userInfoResponse.json();
         const { email, name, picture, id: googleId } = userInfo;
+        
+        console.log('Google user info:', { email, name, picture, googleId });
 
         let cognitoId;
         let isNewUser = false;

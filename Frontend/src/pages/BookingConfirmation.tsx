@@ -209,6 +209,12 @@ const BookingConfirmation = () => {
         },
         theme: {
           color: "#2563eb"
+        },
+        method: {
+          upi: true,
+          card: true,
+          netbanking: true,
+          wallet: true
         }
       };
 

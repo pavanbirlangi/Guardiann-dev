@@ -1,10 +1,11 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from "recharts";
 import { useQuery } from "@tanstack/react-query";
-import { api } from "@/lib/api";
+import axiosInstance from "@/lib/axios";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
+import { Users, BookOpen, Building2, Calendar } from "lucide-react";
 
 interface AdminStatsData {
   totalStats: {
@@ -52,7 +53,7 @@ const AdminStats = () => {
   const { data: statsData, isLoading, error } = useQuery<AdminStatsData>({
     queryKey: ['admin-stats'],
     queryFn: async () => {
-      const response = await api.get<ApiResponse>('/dashboard/admin/stats');
+      const response = await axiosInstance.get<ApiResponse>('/dashboard/admin/stats');
       return response.data.data;
     }
   });

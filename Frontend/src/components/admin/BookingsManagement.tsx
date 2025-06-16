@@ -16,7 +16,7 @@ import {
 import { Download, Eye, Search, Filter, Calendar } from "lucide-react";
 import { toast } from "sonner";
 import { useQuery } from '@tanstack/react-query';
-import { api } from '@/lib/api';
+import axiosInstance from '@/lib/axios';
 
 interface Booking {
   booking_id: string;
@@ -59,7 +59,7 @@ const BookingsManagement = () => {
   const { data: categories } = useQuery<Category[]>({
     queryKey: ['categories'],
     queryFn: async () => {
-      const response = await api.get<CategoriesResponse>('/dashboard/admin/categories');
+      const response = await axiosInstance.get<CategoriesResponse>('/dashboard/admin/categories');
       return response.data.data;
     }
   });
@@ -72,7 +72,7 @@ const BookingsManagement = () => {
       if (categoryFilter !== 'all') params.append('category', categoryFilter);
       if (searchTerm) params.append('search', searchTerm);
 
-      const response = await api.get<ApiResponse>(`/dashboard/admin/bookings?${params.toString()}`);
+      const response = await axiosInstance.get<ApiResponse>(`/dashboard/admin/bookings?${params.toString()}`);
       return response.data.data;
     }
   });

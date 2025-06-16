@@ -12,6 +12,7 @@ import BookingPage from "./pages/BookingPage";
 import BookingConfirmation from "./pages/BookingConfirmation";
 import AboutUs from "./pages/AboutUs";
 import Contact from "./pages/Contact";
+import ContactSuccess from "./pages/ContactSuccess";
 import Auth from "./pages/Auth";
 import UserDashboard from "./pages/UserDashboard";
 import AdminDashboard from "./pages/AdminDashboard";
@@ -80,6 +81,7 @@ const App = () => (
           <Route path="/booking-confirmation/:booking_id" element={<BookingConfirmation />} />
           <Route path="/about" element={<AboutUs />} />
           <Route path="/contact" element={<Contact />} />
+          <Route path="/contact-success" element={<ContactSuccess />} />
           <Route path="/auth" element={<Auth />} />
           <Route path="/auth/google/callback" element={<GoogleCallback />} />
           <Route path="/terms" element={<TermsAndConditions />} />

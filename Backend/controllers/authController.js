@@ -189,10 +189,32 @@ const refreshToken = async (req, res) => {
 
     const response = await cognitoClient.send(command);
 
+    // Get user details to include in response
+    const getUserCommand = new AdminGetUserCommand({
+      UserPoolId: userPoolId,
+      Username: response.AuthenticationResult.IdToken
+    });
+    const userData = await cognitoClient.send(getUserCommand);
+    
+    // Extract user attributes
+    const email = userData.UserAttributes.find(attr => attr.Name === 'email')?.Value;
+    const name = userData.UserAttributes.find(attr => attr.Name === 'name')?.Value;
+    const role = userData.UserAttributes.find(attr => attr.Name === 'custom:role')?.Value || 'USER';
+    const picture = userData.UserAttributes.find(attr => attr.Name === 'picture')?.Value;
+
     res.json({
       success: true,
-      accessToken: response.AuthenticationResult.AccessToken,
-      refreshToken: response.AuthenticationResult.RefreshToken
+      tokens: {
+        accessToken: response.AuthenticationResult.AccessToken,
+        idToken: response.AuthenticationResult.IdToken,
+        refreshToken: response.AuthenticationResult.RefreshToken || refreshToken // Keep old refresh token if new one not provided
+      },
+      user: {
+        email,
+        name,
+        picture,
+        role
+      }
     });
   } catch (error) {
     console.error('Token refresh error:', error);

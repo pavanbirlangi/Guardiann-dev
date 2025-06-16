@@ -29,7 +29,13 @@ const syncUserToRDS = async (cognitoId, email, googleId = null) => {
         const phone = cognitoUser.UserAttributes.find(attr => attr.Name === 'phone_number')?.Value || null;
         const picture = cognitoUser.UserAttributes.find(attr => attr.Name === 'picture')?.Value || null;
 
-        console.log('Retrieved Cognito user attributes:', { fullName, phone, picture, googleId });
+        console.log('Retrieved Cognito user attributes:', { 
+          fullName, 
+          phone, 
+          picture, 
+          googleId,
+          pictureAttribute: cognitoUser.UserAttributes.find(attr => attr.Name === 'picture')
+        });
 
         // Check if user exists in RDS using cognito_id (which is the Cognito username)
         const existingUser = await query(

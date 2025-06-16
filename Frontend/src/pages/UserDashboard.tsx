@@ -78,6 +78,8 @@ const UserDashboard = () => {
         { headers: { Authorization: `Bearer ${token}` } }
       );
       if (response.data.success) {
+        console.log('User profile data:', response.data.data);
+        console.log('Profile picture URL:', response.data.data.profile_picture_url);
         setUserProfile(response.data.data);
       }
     } catch (error) {
@@ -183,6 +185,24 @@ const UserDashboard = () => {
                             src={userProfile.profile_picture_url} 
                             alt={userProfile.full_name}
                             className="w-full h-full rounded-full object-cover"
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement;
+                              console.error('Profile picture loading error:', {
+                                url: userProfile.profile_picture_url,
+                                error: e,
+                                status: (e.target as HTMLImageElement).naturalWidth === 0 ? 'Failed to load' : 'Loaded but invalid'
+                              });
+                              target.src = DEFAULT_THUMBNAIL;
+                            }}
+                            onLoad={(e) => {
+                              console.log('Profile picture loaded successfully:', {
+                                url: userProfile.profile_picture_url,
+                                dimensions: {
+                                  width: (e.target as HTMLImageElement).naturalWidth,
+                                  height: (e.target as HTMLImageElement).naturalHeight
+                                }
+                              });
+                            }}
                           />
                         ) : (
                           <User className="h-10 w-10 text-education-600" />
