@@ -78,11 +78,11 @@ axiosInstance.interceptors.response.use(
         console.error('Token refresh error:', refreshError);
         // Only clear tokens and redirect if it's not a refresh token request
         if (!originalRequest.url?.includes('/auth/refresh-token')) {
-          localStorage.removeItem('accessToken');
-          localStorage.removeItem('refreshToken');
-          localStorage.removeItem('idToken');
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('refreshToken');
+        localStorage.removeItem('idToken');
           localStorage.removeItem('user');
-          window.location.href = '/auth';
+        window.location.href = '/auth';
         }
         return Promise.reject(refreshError);
       }

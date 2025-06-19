@@ -53,8 +53,8 @@ const InstitutionListing = () => {
   }, [category]);
 
   const fetchInstitutions = async (page = 1) => {
-    try {
-      setLoading(true);
+      try {
+        setLoading(true);
       const queryParams = new URLSearchParams({
         page: page.toString(),
         limit: institutionsPerPage.toString(),
@@ -68,22 +68,22 @@ const InstitutionListing = () => {
         pagination: { totalPages: number; total: number };
         message?: string;
       }>(`${import.meta.env.VITE_API_URL}/institutions/list/${category}?${queryParams}`);
-      
-      if (response.data.success) {
-        setInstitutions(response.data.data || []);
+        
+        if (response.data.success) {
+          setInstitutions(response.data.data || []);
         setFilteredInstitutions(response.data.data || []);
         setTotalPages(response.data.pagination.totalPages);
         setTotalInstitutions(response.data.pagination.total);
         setCurrentPage(page);
-      } else {
-        throw new Error(response.data.message || 'Failed to fetch institutions');
-      }
+        } else {
+          throw new Error(response.data.message || 'Failed to fetch institutions');
+        }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch institutions');
-    } finally {
-      setLoading(false);
-    }
-  };
+      } finally {
+        setLoading(false);
+      }
+    };
 
   useEffect(() => {
     fetchInstitutions(1);

@@ -21,7 +21,7 @@ const Footer = () => {
   useEffect(() => {
     const fetchSettings = async () => {
       try {
-        const response = await axios.get<ApiResponse>('http://localhost:3000/api/settings');
+        const response = await axios.get<ApiResponse>('https://guardiann.in/api/settings');
         if (response.data.success) {
           setSettings(response.data.data);
         }

@@ -42,7 +42,7 @@ const BookingPage = () => {
   React.useEffect(() => {
     const fetchInstitutionData = async () => {
       try {
-        const response = await fetch(`http://localhost:3000/api/institutions/details/${id}`);
+        const response = await fetch(`${import.meta.env.VITE_API_URL}/institutions/details/${id}`);
         if (!response.ok) {
           throw new Error('Failed to fetch institution data');
         }
@@ -159,7 +159,7 @@ const BookingPage = () => {
     if (validateForm()) {
       try {
         // First create a booking
-        const bookingResponse = await fetch('http://localhost:3000/api/institutions/book', {
+        const bookingResponse = await fetch(`${import.meta.env.VITE_API_URL}/institutions/book`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -199,7 +199,7 @@ const BookingPage = () => {
                 console.log('Payment response:', response);
                 console.log('Booking data:', bookingData);
 
-                const verifyResponse = await fetch('http://localhost:3000/api/institutions/verify-payment', {
+                const verifyResponse = await fetch(`${import.meta.env.VITE_API_URL}/institutions/verify-payment`, {
                   method: 'POST',
                   headers: {
                     'Content-Type': 'application/json',

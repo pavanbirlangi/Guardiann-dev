@@ -11,7 +11,7 @@ import { useAuth } from '@/hooks/useAuth';
 
 // Create axios instance with base URL
 const api = axios.create({
-  baseURL: 'http://localhost:3000',
+  baseURL: 'https://guardiann.in',
   headers: {
     'Content-Type': 'application/json'
   }

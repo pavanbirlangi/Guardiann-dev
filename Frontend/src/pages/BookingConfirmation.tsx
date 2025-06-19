@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { API_BASE_URL } from '@/config';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -58,7 +59,7 @@ const BookingConfirmation = () => {
           return;
         }
 
-        const response = await fetch(`http://localhost:3000/api/institutions/booking/${booking_id}`, {
+        const response = await fetch(`${import.meta.env.VITE_API_URL}/institutions/booking/${booking_id}`, {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
           }
@@ -153,7 +154,7 @@ const BookingConfirmation = () => {
   const handlePayment = async () => {
     try {
       // Create payment order
-      const orderResponse = await fetch('http://localhost:3000/api/institutions/payment/create-order', {
+      const orderResponse = await fetch(`${import.meta.env.VITE_API_URL}/institutions/payment/create-order`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -182,7 +183,7 @@ const BookingConfirmation = () => {
         handler: async function (response: any) {
           try {
             // Verify payment
-            const verifyResponse = await fetch('http://localhost:3000/api/institutions/verify-payment', {
+            const verifyResponse = await fetch(`${import.meta.env.VITE_API_URL}/institutions/verify-payment`, {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',

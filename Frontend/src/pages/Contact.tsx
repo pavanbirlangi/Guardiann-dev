@@ -61,7 +61,7 @@ const Contact = () => {
   useEffect(() => {
     const fetchSettings = async () => {
       try {
-        const response = await axios.get<ApiResponse>('http://localhost:3000/api/settings');
+        const response = await axios.get<ApiResponse>(`${import.meta.env.VITE_API_URL}/settings`);
         console.log('Settings response:', response.data);
         if (response.data.success && response.data.data) {
           setSettings(response.data.data);
